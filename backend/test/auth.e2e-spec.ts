@@ -38,9 +38,15 @@ describe('AuthModule (e2e)', () => {
       getRepositoryToken(ApiCredential),
     );
 
-    // Clear DB
-    await apiCredentialRepository.query('DELETE FROM api_credentials');
-    await merchantRepository.query('DELETE FROM merchants');
+    // Clear DB in proper foreign key order
+    await apiCredentialRepository.query('DELETE FROM reconciliation_results').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM reconciliation_runs').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM settlements').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM refunds').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM payments').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM idempotency_keys').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM api_credentials').catch(() => {});
+    await merchantRepository.query('DELETE FROM merchants').catch(() => {});
 
     // Create a merchant
     const merchant = merchantRepository.create({
@@ -53,8 +59,14 @@ describe('AuthModule (e2e)', () => {
   });
 
   afterAll(async () => {
-    await apiCredentialRepository.query('DELETE FROM api_credentials');
-    await merchantRepository.query('DELETE FROM merchants');
+    await apiCredentialRepository.query('DELETE FROM reconciliation_results').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM reconciliation_runs').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM settlements').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM refunds').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM payments').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM idempotency_keys').catch(() => {});
+    await apiCredentialRepository.query('DELETE FROM api_credentials').catch(() => {});
+    await merchantRepository.query('DELETE FROM merchants').catch(() => {});
     await app.close();
   });
 

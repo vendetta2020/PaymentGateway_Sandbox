@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { PaymentModule } from './payment/payment.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { RefundModule } from './refund/refund.module';
+import { SettlementModule } from './settlement/settlement.module';
+import { ReconciliationModule } from './reconciliation/reconciliation.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { RefundModule } from './refund/refund.module';
     PaymentModule,
     WebhookModule,
     RefundModule,
+    SettlementModule,
+    ReconciliationModule,
   ],
 })
 export class AppModule {}

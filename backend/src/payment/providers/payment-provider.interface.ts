@@ -7,4 +7,5 @@ export interface ProviderResult {
 
 export interface PaymentProvider {
   process(payment: Payment): Promise<ProviderResult>;
+  refund(refund: any, payment: Payment): Promise<ProviderResult>;
 }

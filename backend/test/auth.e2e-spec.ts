@@ -96,7 +96,8 @@ describe('AuthModule (e2e)', () => {
     });
 
     it('GET /api/v1/auth/me should fail with invalid secret', async () => {
-      const tamperedSecret = plaintextSecret.substring(0, plaintextSecret.length - 1) + 'a';
+      const lastChar = plaintextSecret.slice(-1);
+      const tamperedSecret = plaintextSecret.slice(0, -1) + (lastChar === 'a' ? 'b' : 'a');
       await request(app.getHttpServer())
         .get('/api/v1/auth/me')
         .set('Authorization', `Bearer ${tamperedSecret}`)

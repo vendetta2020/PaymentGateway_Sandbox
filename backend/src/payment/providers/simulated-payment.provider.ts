@@ -28,4 +28,29 @@ export class SimulatedPaymentProvider implements PaymentProvider {
       reference: `sim_succ_${crypto.randomUUID()}`,
     };
   }
+
+  async refund(refund: any, payment: Payment): Promise<ProviderResult> {
+    // Deterministic simulation based on refund reason, payment description, or orderId
+    const triggerString =
+      `${refund.reason || ''} ${payment.orderId} ${payment.description || ''}`.toUpperCase();
+
+    // Simulate system error (Unexpected provider exception)
+    if (triggerString.includes('SIMULATE_SYSTEM_ERROR')) {
+      throw new Error('Simulated external refund provider connection timeout or internal error');
+    }
+
+    // Simulate business logic failure
+    if (triggerString.includes('SIMULATE_FAILURE')) {
+      return {
+        status: 'FAILED',
+        reference: `ref_sim_fail_${crypto.randomUUID()}`,
+      };
+    }
+
+    // Simulate success
+    return {
+      status: 'SUCCESS',
+      reference: `ref_sim_succ_${crypto.randomUUID()}`,
+    };
+  }
 }

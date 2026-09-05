@@ -21,6 +21,6 @@ import { WebhookModule } from '../webhook/webhook.module';
       useClass: SimulatedPaymentProvider,
     },
   ],
-  exports: [PaymentService, IdempotencyService],
+  exports: [PaymentService, IdempotencyService, 'PAYMENT_PROVIDER'],
 })
 export class PaymentModule {}

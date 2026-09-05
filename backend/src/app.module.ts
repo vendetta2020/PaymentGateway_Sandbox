@@ -7,6 +7,7 @@ import { MerchantModule } from './merchant/merchant.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentModule } from './payment/payment.module';
 import { WebhookModule } from './webhook/webhook.module';
+import { RefundModule } from './refund/refund.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { WebhookModule } from './webhook/webhook.module';
     AuthModule,
     PaymentModule,
     WebhookModule,
+    RefundModule,
   ],
 })
 export class AppModule {}

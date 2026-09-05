@@ -177,7 +177,7 @@ describe('PaymentModule (e2e)', () => {
           description: 'SIMULATE_FAILURE',
           paymentMethod: 'EWALLET',
         });
-      
+
       const failPaymentId = createRes.body.data.id;
 
       const response = await request(app.getHttpServer())
@@ -197,7 +197,7 @@ describe('PaymentModule (e2e)', () => {
         .send();
 
       expect(response.status).toBe(400);
-      expect(response.body.message).toContain('terminal state');
+      expect(response.body.message).toContain('Cannot process payment in status');
     });
 
     it('should simulate system error as 500 but leave payment PENDING', async () => {
@@ -211,7 +211,7 @@ describe('PaymentModule (e2e)', () => {
           description: 'SIMULATE_SYSTEM_ERROR',
           paymentMethod: 'VIRTUAL_ACCOUNT',
         });
-      
+
       const errPaymentId = createRes.body.data.id;
 
       const response = await request(app.getHttpServer())
@@ -226,7 +226,7 @@ describe('PaymentModule (e2e)', () => {
         .get(`/api/v1/payments/${errPaymentId}`)
         .set('Authorization', `Bearer ${secretA}`)
         .send();
-      
+
       expect(checkRes.body.data.status).toBe('PENDING');
     });
 

@@ -1,4 +1,16 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Req, ParseUUIDPipe, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  ParseUUIDPipe,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { PaymentService } from '../services/payment.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
@@ -36,7 +48,7 @@ export class PaymentController {
         limit,
         offset,
         total,
-      }
+      },
     };
   }
 
@@ -47,7 +59,7 @@ export class PaymentController {
   ) {
     const merchantId = req.merchant.merchantId;
     const payment = await this.paymentService.processPayment(merchantId, id);
-    
+
     return {
       status: 'success',
       data: payment,

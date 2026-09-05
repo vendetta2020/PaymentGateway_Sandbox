@@ -28,16 +28,22 @@ export class Payment {
   @Column({ type: 'varchar', length: 50, name: 'payment_method' })
   paymentMethod!: PaymentMethodType;
 
-  @Column({ type: 'varchar', length: 255, name: 'provider_reference', nullable: true, unique: true })
+  @Column({
+    type: 'varchar',
+    length: 255,
+    name: 'provider_reference',
+    nullable: true,
+    unique: true,
+  })
   providerReference?: string;
 
   // Stored in minor units (e.g., cents or minimal currency unit)
-  @Column({ 
+  @Column({
     type: 'bigint',
     transformer: {
       to: (value: number) => value,
       from: (value: string) => parseInt(value, 10),
-    }
+    },
   })
   amount!: number;
 

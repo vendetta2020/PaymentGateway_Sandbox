@@ -63,9 +63,9 @@ export class PaymentService {
   }
 
   async listPayments(
-    merchantId: string, 
-    limit: number = 10, 
-    offset: number = 0
+    merchantId: string,
+    limit: number = 10,
+    offset: number = 0,
   ): Promise<[Payment[], number]> {
     return this.paymentRepository.findAndCount({
       where: { merchantId },
@@ -76,44 +76,64 @@ export class PaymentService {
   }
 
   async processPayment(merchantId: string, paymentId: string): Promise<Payment> {
-    const payment = await this.getPayment(merchantId, paymentId);
+    // Step 1: Atomically claim the payment by transitioning PENDING → PROCESSING.
+    // This acts as a database-level mutex preventing double provider calls.
+    const claimResult = await this.paymentRepository.update(
+      { id: paymentId, merchantId, status: PaymentStatus.PENDING },
+      { status: PaymentStatus.PROCESSING },
+    );
 
-    if (payment.status !== PaymentStatus.PENDING) {
-      throw new BadRequestException(`Cannot process payment from terminal state ${payment.status}`);
+    if (claimResult.affected === 0) {
+      // Either the payment doesn't exist, doesn't belong to this merchant,
+      // or is not in PENDING status (already processing or terminal).
+      const payment = await this.getPayment(merchantId, paymentId);
+      throw new BadRequestException(
+        `Cannot process payment in status ${payment.status}`,
+      );
     }
 
+    // Step 2: Call the provider. Only one concurrent request can reach here
+    // for any given payment because of the atomic claim above.
     try {
+      const payment = await this.getPayment(merchantId, paymentId);
       const result = await this.paymentProvider.process(payment);
-      
-      const newStatus = result.status === 'SUCCESS' ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED;
 
-      const updateResult = await this.paymentRepository.update(
-        { id: paymentId, merchantId, status: PaymentStatus.PENDING },
-        { 
+      // Step 3: Transition PROCESSING → SUCCEEDED or FAILED based on provider result.
+      const newStatus =
+        result.status === 'SUCCESS' ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED;
+
+      await this.paymentRepository.update(
+        { id: paymentId, merchantId, status: PaymentStatus.PROCESSING },
+        {
           status: newStatus,
-          providerReference: result.reference
-        }
+          providerReference: result.reference,
+        },
       );
-
-      if (updateResult.affected === 0) {
-        throw new BadRequestException(`Race condition: Payment status changed while processing`);
-      }
 
       return this.getPayment(merchantId, paymentId);
     } catch (error) {
-      // Provider system error: Do not mark as FAILED. Keep it PENDING.
-      throw error; // Let the global exception filter handle it (500)
+      // Provider system/infrastructure error: revert PROCESSING → PENDING
+      // so the payment can be retried later.
+      await this.paymentRepository.update(
+        { id: paymentId, merchantId, status: PaymentStatus.PROCESSING },
+        { status: PaymentStatus.PENDING },
+      );
+      throw error;
     }
   }
 
-  async transitionStatus(merchantId: string, paymentId: string, newStatus: PaymentStatus): Promise<Payment> {
+  async transitionStatus(
+    merchantId: string,
+    paymentId: string,
+    newStatus: PaymentStatus,
+  ): Promise<Payment> {
     if (newStatus === PaymentStatus.PENDING) {
       throw new BadRequestException(`Cannot transition to ${PaymentStatus.PENDING}`);
     }
 
     const result = await this.paymentRepository.update(
       { id: paymentId, merchantId, status: PaymentStatus.PENDING },
-      { status: newStatus }
+      { status: newStatus },
     );
 
     if (result.affected === 0) {

@@ -18,8 +18,8 @@ export class IdempotencyService {
     apiPath: string,
     operation: (manager: EntityManager) => Promise<{ status: number; body: T }>,
   ): Promise<{ status: number; body: T }> {
-    // 1. Try to fetch existing completed or in-progress idempotency record
-    let record = await this.idempotencyKeyRepository.findOne({
+    // 1. Try to fetch existing completed idempotency record
+    const record = await this.idempotencyKeyRepository.findOne({
       where: { merchantId, key },
     });
 
@@ -27,7 +27,9 @@ export class IdempotencyService {
       if (record.requestHash !== requestHash) {
         throw new ConflictException('Idempotency key used with a different request payload');
       }
-      return { status: record.responseStatus, body: record.responseBody };
+      if (record.responseStatus != null) {
+        return { status: record.responseStatus, body: record.responseBody };
+      }
     }
 
     // 2. Start a transaction
@@ -36,46 +38,74 @@ export class IdempotencyService {
     await queryRunner.startTransaction();
 
     try {
-      // 3. Execute business logic within the transaction
-      const result = await operation(queryRunner.manager);
-
-      // 4. Save idempotency key within the SAME transaction
-      const newRecord = this.idempotencyKeyRepository.create({
+      // 3. Atomically insert placeholder FIRST inside the transaction.
+      // This immediately locks the unique index tuple (merchant_id, key) in PostgreSQL,
+      // forcing any concurrent request with the same key to wait.
+      const placeholder = this.idempotencyKeyRepository.create({
         merchantId,
         key,
         requestHash,
         apiPath,
-        responseStatus: result.status,
-        responseBody: result.body,
+        responseStatus: null,
+        responseBody: null,
       });
 
-      await queryRunner.manager.save(newRecord);
+      try {
+        await queryRunner.manager.save(placeholder);
+      } catch (insertError) {
+        await queryRunner.rollbackTransaction();
+
+        // 4. Handle concurrent duplicate insert
+        if (insertError instanceof QueryFailedError && (insertError as any).code === '23505') {
+          const constraintName = (insertError as any).constraint;
+          if (constraintName === 'idx_idempotency_merchant_key') {
+            // Another concurrent transaction already claimed this key and will commit or has committed!
+            // Poll for the winning transaction's committed record.
+            let existing = await this.idempotencyKeyRepository.findOne({
+              where: { merchantId, key },
+            });
+
+            let attempts = 0;
+            while ((!existing || existing.responseStatus == null) && attempts < 40) {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              existing = await this.idempotencyKeyRepository.findOne({
+                where: { merchantId, key },
+              });
+              attempts++;
+            }
+
+            if (existing) {
+              if (existing.requestHash !== requestHash) {
+                throw new ConflictException('Idempotency key used with a different request payload');
+              }
+              if (existing.responseStatus != null) {
+                return { status: existing.responseStatus, body: existing.responseBody };
+              }
+            }
+          }
+        }
+        throw insertError;
+      }
+
+      // 5. Execute business logic within the SAME transaction.
+      // Only the winning thread reaches here.
+      const result = await operation(queryRunner.manager);
+
+      // 6. Update the placeholder record with final response status & body
+      placeholder.responseStatus = result.status;
+      placeholder.responseBody = result.body;
+      await queryRunner.manager.save(placeholder);
+
+      // 7. Commit the transaction atomically
       await queryRunner.commitTransaction();
 
       return result;
     } catch (error) {
-      // 5. Rollback on ANY error (business, validation, or db unique violation)
-      await queryRunner.rollbackTransaction();
-
-      // 6. Handle concurrent insert detection
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
-        const constraintName = (error as any).constraint;
-        if (constraintName === 'idx_idempotency_merchant_key') {
-          // Another transaction successfully committed this key first!
-          const existing = await this.idempotencyKeyRepository.findOne({
-            where: { merchantId, key },
-          });
-
-          if (existing) {
-            if (existing.requestHash !== requestHash) {
-              throw new ConflictException('Idempotency key used with a different request payload');
-            }
-            return { status: existing.responseStatus, body: existing.responseBody };
-          }
-        }
+      try {
+        await queryRunner.rollbackTransaction();
+      } catch (_) {
+        // transaction may have already rolled back
       }
-      
-      // Rethrow if it's a business logic error (e.g. orderId unique violation, or validation)
       throw error;
     } finally {
       await queryRunner.release();

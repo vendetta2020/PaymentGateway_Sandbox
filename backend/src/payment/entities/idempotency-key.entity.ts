@@ -18,10 +18,10 @@ export class IdempotencyKey {
   @Column({ name: 'api_path', type: 'varchar', length: 255 })
   apiPath!: string;
 
-  @Column({ name: 'response_status', type: 'int' })
-  responseStatus!: number;
+  @Column({ name: 'response_status', type: 'int', nullable: true })
+  responseStatus!: number | null;
 
-  @Column({ name: 'response_body', type: 'jsonb' })
+  @Column({ name: 'response_body', type: 'jsonb', nullable: true })
   responseBody!: any;
 
   @CreateDateColumn({ name: 'created_at' })

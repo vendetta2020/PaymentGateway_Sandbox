@@ -97,12 +97,13 @@ describe('IdempotencyService', () => {
 
     expect(executed).toBe(true);
     expect(queryRunner.startTransaction).toHaveBeenCalled();
-    expect(queryRunner.manager.save).toHaveBeenCalledWith(expect.objectContaining({
+    expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+    expect(queryRunner.manager.save).toHaveBeenLastCalledWith(expect.objectContaining({
       merchantId: 'm1',
       key: 'k1',
       requestHash: 'hash1',
       responseStatus: 201,
-      responseBody: { data: 'created' }
+      responseBody: { data: 'created' },
     }));
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
     expect(queryRunner.release).toHaveBeenCalled();
@@ -111,10 +112,10 @@ describe('IdempotencyService', () => {
     expect(result.body).toEqual({ data: 'created' });
   });
 
-  it('should rollback and return 409 Conflict if concurrent transaction commits first (23505)', async () => {
+  it('should rollback and return cached response if concurrent transaction commits first (23505)', async () => {
     idempotencyRepository.findOne
       .mockResolvedValueOnce(null) // first check
-      .mockResolvedValueOnce({       // second check after concurrent commit
+      .mockResolvedValueOnce({       // check after concurrent commit
         requestHash: 'hash1',
         responseStatus: 201,
         responseBody: { data: 'concurrent-success' },
@@ -141,6 +142,8 @@ describe('IdempotencyService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({
         requestHash: 'differentHash',
+        responseStatus: 201,
+        responseBody: { data: 'other-data' },
       } as IdempotencyKey);
 
     const uniqueError = Object.assign(new QueryFailedError('query', [], new Error()), {
@@ -171,6 +174,7 @@ describe('IdempotencyService', () => {
     ).rejects.toThrow(businessError);
 
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-    expect(queryRunner.manager.save).not.toHaveBeenCalled();
+    // Placeholder was saved, but second save with response was never called
+    expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
   });
 });

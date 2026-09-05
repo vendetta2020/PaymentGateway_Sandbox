@@ -438,13 +438,14 @@ describe('PaymentModule (e2e)', () => {
 
       const responses = await Promise.all(promises);
 
-      // Verify all resolved to exactly the same payment ID, or at least 201s with same IDs
-      const successResponses = responses.filter(r => r.status === 201);
-      
-      expect(successResponses.length).toBeGreaterThan(0);
-      
-      const firstId = successResponses[0].body.data.id;
-      for (const res of successResponses) {
+      // Strictly expect ALL 5 concurrent requests to return 201 with the exact same payment ID
+      expect(responses).toHaveLength(5);
+      for (const res of responses) {
+        expect(res.status).toBe(201);
+      }
+
+      const firstId = responses[0].body.data.id;
+      for (const res of responses) {
         expect(res.body.data.id).toBe(firstId);
       }
 
@@ -453,6 +454,40 @@ describe('PaymentModule (e2e)', () => {
         where: { orderId: 'IDEM-CONCUR' },
       });
       expect(dbCount).toBe(1);
+    });
+
+    it('should reject concurrent requests with the same key but different payloads (one 201, one 409)', async () => {
+      const key = 'concurrent-different-payload-key';
+
+      const payloadA = {
+        amount: 50000,
+        currency: 'IDR',
+        orderId: 'ORD-DIFF-1',
+        paymentMethod: 'QRIS',
+      };
+
+      const payloadB = {
+        amount: 60000,
+        currency: 'IDR',
+        orderId: 'ORD-DIFF-2',
+        paymentMethod: 'QRIS',
+      };
+
+      const [resA, resB] = await Promise.all([
+        request(app.getHttpServer())
+          .post('/api/v1/payments')
+          .set('Authorization', `Bearer ${secretA}`)
+          .set('Idempotency-Key', key)
+          .send(payloadA),
+        request(app.getHttpServer())
+          .post('/api/v1/payments')
+          .set('Authorization', `Bearer ${secretA}`)
+          .set('Idempotency-Key', key)
+          .send(payloadB),
+      ]);
+
+      const statuses = [resA.status, resB.status].sort();
+      expect(statuses).toEqual([201, 409]);
     });
 
     it('should process payment idempotently', async () => {
@@ -478,14 +513,12 @@ describe('PaymentModule (e2e)', () => {
       );
 
       const responses = await Promise.all(promises);
-      const successResponses = responses.filter(r => r.status === 201);
-      
-      expect(successResponses.length).toBeGreaterThan(0);
-      const firstStatus = successResponses[0].body.data.status;
-      expect(firstStatus).toBe('SUCCEEDED');
-      
-      for (const res of successResponses) {
-         expect(res.body.data.status).toBe('SUCCEEDED');
+
+      // Strictly expect ALL 3 concurrent process requests to return 201 with SUCCEEDED status
+      expect(responses).toHaveLength(3);
+      for (const res of responses) {
+        expect(res.status).toBe(201);
+        expect(res.body.data.status).toBe('SUCCEEDED');
       }
     });
   });

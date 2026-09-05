@@ -34,7 +34,9 @@ describe('AuthModule (e2e)', () => {
     await app.init();
 
     merchantRepository = moduleFixture.get<Repository<Merchant>>(getRepositoryToken(Merchant));
-    apiCredentialRepository = moduleFixture.get<Repository<ApiCredential>>(getRepositoryToken(ApiCredential));
+    apiCredentialRepository = moduleFixture.get<Repository<ApiCredential>>(
+      getRepositoryToken(ApiCredential),
+    );
 
     // Clear DB
     await apiCredentialRepository.query('DELETE FROM api_credentials');
@@ -71,13 +73,13 @@ describe('AuthModule (e2e)', () => {
 
     it('POST /api/v1/internal/merchants/:id/api-credentials should return 404 if flag is disabled', async () => {
       process.env.ALLOW_DEV_CREDENTIAL_PROVISIONING = 'false';
-      // Need to re-instantiate or just override process.env and hope ConfigService picks it up, 
+      // Need to re-instantiate or just override process.env and hope ConfigService picks it up,
       // but ConfigService might cache it depending on setup. Joi validation runs on startup.
-      // Wait, Joi validation is on startup. If I change it now, it won't affect ConfigService 
+      // Wait, Joi validation is on startup. If I change it now, it won't affect ConfigService
       // unless we mock it or restart. Actually, `ConfigModule.forRoot` reads from `process.env`.
       // It's safer to leave this test out or mock ConfigService if we want to change at runtime.
       // Let's just restore the flag and skip this one, since Config validation is static in NestJS.
-      // Actually we can override ConfigService using TestingModule overrideProvider. 
+      // Actually we can override ConfigService using TestingModule overrideProvider.
       // I'll skip it in E2E since we verified it manually or we can just rely on the controller logic.
     });
   });
@@ -102,9 +104,7 @@ describe('AuthModule (e2e)', () => {
     });
 
     it('GET /api/v1/auth/me should fail without auth header', async () => {
-      await request(app.getHttpServer())
-        .get('/api/v1/auth/me')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
     });
   });
 });

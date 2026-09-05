@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { ApiCredentialService } from '../services/api-credential.service';
 import { MerchantStatus } from '../../merchant/enums/merchant-status.enum';
@@ -27,7 +22,7 @@ export class ApiAuthGuard implements CanActivate {
     }
 
     const publicKey = parts[2];
-    
+
     // Find active credential by public key
     const credential = await this.apiCredentialService.findActiveByPublicKey(publicKey);
     if (!credential) {

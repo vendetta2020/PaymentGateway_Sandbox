@@ -54,7 +54,7 @@ describe('ApiAuthGuard', () => {
   it('should throw UnauthorizedException if credential is not found', async () => {
     const context = createMockContext('Bearer sk_test_validkey_secret');
     apiCredentialService.findActiveByPublicKey.mockResolvedValueOnce(null);
-    
+
     await expect(guard.canActivate(context)).rejects.toThrow('Invalid API key');
   });
 
@@ -65,7 +65,7 @@ describe('ApiAuthGuard', () => {
       merchantId: 'merch-1',
       merchant: { status: MerchantStatus.SUSPENDED },
     } as any);
-    
+
     await expect(guard.canActivate(context)).rejects.toThrow('Merchant is not active');
   });
 
@@ -78,7 +78,7 @@ describe('ApiAuthGuard', () => {
       merchant: { status: MerchantStatus.ACTIVE },
     } as any);
     apiCredentialService.verifySecret.mockReturnValueOnce(false);
-    
+
     await expect(guard.canActivate(context)).rejects.toThrow('Invalid API key');
   });
 
@@ -91,10 +91,10 @@ describe('ApiAuthGuard', () => {
       merchant: { status: MerchantStatus.ACTIVE },
     } as any);
     apiCredentialService.verifySecret.mockReturnValueOnce(true);
-    
+
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
-    
+
     const req = context.switchToHttp().getRequest() as any;
     expect(req.merchant).toEqual({
       merchantId: 'merch-1',

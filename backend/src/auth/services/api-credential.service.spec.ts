@@ -17,7 +17,7 @@ describe('ApiCredentialService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
     };
-    
+
     const merchantRepoMock = {
       findOne: jest.fn(),
     };
@@ -53,17 +53,17 @@ describe('ApiCredentialService', () => {
       apiCredentialRepository.save.mockResolvedValueOnce({ id: 'cred-id' } as any);
 
       const result = await service.createCredential('some-id');
-      
+
       expect(result).toHaveProperty('credentialId');
       expect(result).toHaveProperty('publicKey');
       expect(result).toHaveProperty('plaintextSecret');
       expect(result.plaintextSecret).toMatch(/^sk_test_[a-f0-9]{32}_[a-f0-9]{64}$/);
-      
+
       expect(apiCredentialRepository.save).toHaveBeenCalled();
       const savedDto = apiCredentialRepository.create.mock.calls[0][0] as ApiCredential;
       expect(savedDto.publicKey).toBe(result.publicKey);
       expect(savedDto.secretHash).toBeDefined();
-      
+
       // Ensure plaintext isn't stored in hash field
       expect(savedDto.secretHash).not.toContain(result.plaintextSecret);
       expect(savedDto.secretHash).toHaveLength(64); // SHA-256 hex length
@@ -77,7 +77,7 @@ describe('ApiCredentialService', () => {
       apiCredentialRepository.create.mockImplementationOnce((dto) => dto as any);
       const { plaintextSecret } = await service.createCredential('123');
       const savedDto = apiCredentialRepository.create.mock.calls[0][0];
-      
+
       // Verify
       const isValid = service.verifySecret(plaintextSecret, (savedDto as ApiCredential).secretHash);
       expect(isValid).toBe(true);
@@ -88,7 +88,7 @@ describe('ApiCredentialService', () => {
       apiCredentialRepository.create.mockImplementationOnce((dto) => dto as any);
       const { plaintextSecret } = await service.createCredential('123');
       const savedDto = apiCredentialRepository.create.mock.calls[0][0];
-      
+
       // Verify with tampered secret
       const tamperedSecret = plaintextSecret.substring(0, plaintextSecret.length - 1) + 'a';
       const isValid = service.verifySecret(tamperedSecret, (savedDto as ApiCredential).secretHash);

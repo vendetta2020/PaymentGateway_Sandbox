@@ -13,14 +13,18 @@ export class InternalApiCredentialController {
   async createCredential(
     @Param('merchantId', new ParseUUIDPipe({ version: '4' })) merchantId: string,
   ) {
-    const isDevProvisioningAllowed = this.configService.get<boolean>('ALLOW_DEV_CREDENTIAL_PROVISIONING');
-    
+    const isDevProvisioningAllowed = this.configService.get<boolean>(
+      'ALLOW_DEV_CREDENTIAL_PROVISIONING',
+    );
+
     if (!isDevProvisioningAllowed) {
-      throw new NotFoundException('Cannot POST /api/v1/internal/merchants/:merchantId/api-credentials');
+      throw new NotFoundException(
+        'Cannot POST /api/v1/internal/merchants/:merchantId/api-credentials',
+      );
     }
 
     const result = await this.apiCredentialService.createCredential(merchantId);
-    
+
     // We return the plaintextSecret ONLY ONCE here.
     return {
       status: 'success',

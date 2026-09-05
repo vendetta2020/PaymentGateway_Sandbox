@@ -4,6 +4,7 @@ import { validateConfig } from './config/config.validation';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { MerchantModule } from './merchant/merchant.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { MerchantModule } from './merchant/merchant.module';
     // API modules
     HealthModule,
     MerchantModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

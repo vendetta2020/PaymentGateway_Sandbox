@@ -3,7 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Merchant } from './entities/merchant.entity';
 import { CreateMerchantDto } from './dto/create-merchant.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { MerchantStatus } from './enums/merchant-status.enum';
+
+export interface PaginatedMerchantsResponse {
+  data: Merchant[];
+  meta: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
 
 @Injectable()
 export class MerchantService {
@@ -16,6 +26,7 @@ export class MerchantService {
 
   /**
    * Creates a new merchant after ensuring email uniqueness.
+   * Merchant status is strictly controlled by the server (defaulting to ACTIVE).
    */
   async create(createMerchantDto: CreateMerchantDto): Promise<Merchant> {
     const normalizedEmail = createMerchantDto.email.trim().toLowerCase();
@@ -33,7 +44,7 @@ export class MerchantService {
       name: createMerchantDto.name.trim(),
       businessName: createMerchantDto.businessName.trim(),
       email: normalizedEmail,
-      status: createMerchantDto.status ?? MerchantStatus.ACTIVE,
+      status: MerchantStatus.ACTIVE,
     });
 
     try {
@@ -70,11 +81,25 @@ export class MerchantService {
   }
 
   /**
-   * Retrieves all merchants ordered by creation date.
+   * Retrieves merchants with bounded pagination.
    */
-  async findAll(): Promise<Merchant[]> {
-    return this.merchantRepository.find({
+  async findAll(paginationDto?: PaginationDto): Promise<PaginatedMerchantsResponse> {
+    const limit = paginationDto?.limit ?? 20;
+    const offset = paginationDto?.offset ?? 0;
+
+    const [data, total] = await this.merchantRepository.findAndCount({
       order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        limit,
+        offset,
+      },
+    };
   }
 }

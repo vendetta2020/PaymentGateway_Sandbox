@@ -1,10 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableCheck } from 'typeorm';
+import { MigrationInterface, QueryRunner, Table, TableCheck } from 'typeorm';
 
 export class CreateMerchantsTable1725523200000 implements MigrationInterface {
   name = 'CreateMerchantsTable1725523200000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Ensure pgcrypto extension is enabled for gen_random_uuid() on older postgres or standard uuid generation
+    // Ensure pgcrypto extension is enabled for gen_random_uuid()
     await queryRunner.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
 
     await queryRunner.createTable(
@@ -34,7 +34,6 @@ export class CreateMerchantsTable1725523200000 implements MigrationInterface {
             type: 'varchar',
             length: '255',
             isNullable: false,
-            isUnique: true,
           },
           {
             name: 'status',
@@ -60,14 +59,10 @@ export class CreateMerchantsTable1725523200000 implements MigrationInterface {
       true,
     );
 
-    // Add unique index on email
-    await queryRunner.createIndex(
-      'merchants',
-      new TableIndex({
-        name: 'idx_merchants_email',
-        columnNames: ['email'],
-        isUnique: true,
-      }),
+    // Enforce case-insensitive uniqueness on email at database level
+    // Single non-redundant index on LOWER(email)
+    await queryRunner.query(
+      'CREATE UNIQUE INDEX "idx_merchants_email_lower" ON "merchants" (LOWER("email"))',
     );
 
     // Add check constraint to enforce status invariant at database level
@@ -82,7 +77,7 @@ export class CreateMerchantsTable1725523200000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropCheckConstraint('merchants', 'chk_merchants_status');
-    await queryRunner.dropIndex('merchants', 'idx_merchants_email');
+    await queryRunner.query('DROP INDEX IF EXISTS "idx_merchants_email_lower"');
     await queryRunner.dropTable('merchants', true);
   }
 }

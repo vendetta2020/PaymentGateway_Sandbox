@@ -40,7 +40,7 @@ describe('MerchantController (e2e)', () => {
   });
 
   describe('POST /api/v1/merchants', () => {
-    it('should create a valid merchant with status 201', async () => {
+    it('should create a valid merchant with status 201 and server-side ACTIVE status', async () => {
       const payload = {
         name: 'PT Toko Sejahtera',
         businessName: 'Toko Sejahtera Indonesia PT',
@@ -63,11 +63,11 @@ describe('MerchantController (e2e)', () => {
       createdMerchantId = response.body.id;
     });
 
-    it('should reject merchant creation with duplicate email with status 409', async () => {
+    it('should reject merchant creation with duplicate case-insensitive email (e.g. UPPERCASE) with status 409', async () => {
       const payload = {
-        name: 'Duplicate Company',
+        name: 'Duplicate Company Case Insensitive',
         businessName: 'Duplicate Company PT',
-        email: testEmail, // same email as previous test
+        email: testEmail.toUpperCase(), // Case-insensitive duplicate test
       };
 
       const response = await request(app.getHttpServer())
@@ -78,6 +78,25 @@ describe('MerchantController (e2e)', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.statusCode).toBe(409);
       expect(response.body.message).toContain('already exists');
+    });
+
+    it('should reject client attempting to dictate status on creation with status 400', async () => {
+      const payload = {
+        name: 'Hacker Merchant',
+        businessName: 'Hacker Inc',
+        email: `hacker_${uniqueSuffix}@example.com`,
+        status: 'SUSPENDED', // Should be rejected by forbidNonWhitelisted
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/merchants')
+        .send(payload)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.statusCode).toBe(400);
+      expect(response.body.message).toBe('Validation failed');
+      expect(response.body.details.some((d: string) => d.includes('status'))).toBe(true);
     });
 
     it('should reject creation with missing required fields with status 400', async () => {
@@ -148,13 +167,39 @@ describe('MerchantController (e2e)', () => {
   });
 
   describe('GET /api/v1/merchants', () => {
-    it('should return list of merchants with status 200', async () => {
+    it('should return paginated list of merchants with status 200', async () => {
       const response = await request(app.getHttpServer()).get('/api/v1/merchants').expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(1);
-      const found = response.body.find((m: { id: string }) => m.id === createdMerchantId);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('meta');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.meta).toHaveProperty('total');
+      expect(response.body.meta).toHaveProperty('limit');
+      expect(response.body.meta).toHaveProperty('offset');
+      expect(response.body.meta.limit).toBe(20);
+      expect(response.body.meta.offset).toBe(0);
+
+      const found = response.body.data.find((m: { id: string }) => m.id === createdMerchantId);
       expect(found).toBeDefined();
+    });
+
+    it('should respect custom limit and offset query parameters', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/merchants?limit=1&offset=0')
+        .expect(200);
+
+      expect(response.body.data.length).toBeLessThanOrEqual(1);
+      expect(response.body.meta.limit).toBe(1);
+      expect(response.body.meta.offset).toBe(0);
+    });
+
+    it('should reject invalid pagination parameters with status 400', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/merchants?limit=9999') // exceeds max: 100
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.statusCode).toBe(400);
     });
   });
 });

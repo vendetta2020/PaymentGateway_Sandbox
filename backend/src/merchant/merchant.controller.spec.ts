@@ -65,12 +65,17 @@ describe('MerchantController', () => {
     expect(result).toEqual(mockMerchant);
   });
 
-  it('should call service.findAll', async () => {
-    (service.findAll as jest.Mock).mockResolvedValue([mockMerchant]);
+  it('should call service.findAll with paginationDto', async () => {
+    const paginationDto = { limit: 10, offset: 0 };
+    const mockPaginated = {
+      data: [mockMerchant],
+      meta: { total: 1, limit: 10, offset: 0 },
+    };
+    (service.findAll as jest.Mock).mockResolvedValue(mockPaginated);
 
-    const result = await controller.findAll();
+    const result = await controller.findAll(paginationDto);
 
-    expect(service.findAll).toHaveBeenCalledTimes(1);
-    expect(result).toEqual([mockMerchant]);
+    expect(service.findAll).toHaveBeenCalledWith(paginationDto);
+    expect(result).toEqual(mockPaginated);
   });
 });

@@ -4,12 +4,14 @@ import {
   Post,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { MerchantService } from './merchant.service';
+import { MerchantService, PaginatedMerchantsResponse } from './merchant.service';
 import { CreateMerchantDto } from './dto/create-merchant.dto';
+import { PaginationDto } from './dto/pagination.dto';
 import { Merchant } from './entities/merchant.entity';
 
 /**
@@ -34,7 +36,7 @@ export class MerchantController {
   }
 
   @Get()
-  async findAll(): Promise<Merchant[]> {
-    return this.merchantService.findAll();
+  async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedMerchantsResponse> {
+    return this.merchantService.findAll(paginationDto);
   }
 }

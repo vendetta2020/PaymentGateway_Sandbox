@@ -4,7 +4,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  Index,
 } from 'typeorm';
 import { MerchantStatus } from '../enums/merchant-status.enum';
 
@@ -13,8 +12,9 @@ import { MerchantStatus } from '../enums/merchant-status.enum';
  *
  * Design considerations:
  * - ID is UUIDv4 for distributed uniqueness and security against enumeration.
- * - Email is strictly UNIQUE at the database level and stored normalized (lowercase, trimmed).
+ * - Email uniqueness is enforced at database level via case-insensitive index on LOWER(email).
  * - BusinessName represents the official trading entity.
+ * - Status lifecycle is constrained by MerchantStatus enum and DB check constraint.
  * - No monetary/payment balance fields exist here — those belong to future payment domains.
  */
 @Entity('merchants')
@@ -28,8 +28,7 @@ export class Merchant {
   @Column({ name: 'business_name', type: 'varchar', length: 255 })
   businessName!: string;
 
-  @Index('idx_merchants_email', { unique: true })
-  @Column({ type: 'varchar', length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255 })
   email!: string;
 
   @Column({

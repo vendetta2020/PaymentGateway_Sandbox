@@ -25,7 +25,7 @@ describe('MerchantService', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       save: jest.fn(),
-      find: jest.fn(),
+      findAndCount: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -46,7 +46,7 @@ describe('MerchantService', () => {
   });
 
   describe('create', () => {
-    it('should create and save a new merchant successfully with normalized email', async () => {
+    it('should create and save a new merchant successfully with normalized email and server-side ACTIVE status', async () => {
       const createDto = {
         name: '  PT Acme Solusi  ',
         businessName: '  Acme Solutions Inc.  ',
@@ -120,15 +120,44 @@ describe('MerchantService', () => {
   });
 
   describe('findAll', () => {
-    it('should return an array of merchants', async () => {
-      (repository.find as jest.Mock).mockResolvedValue([mockMerchant]);
+    it('should return paginated merchants with default limit and offset', async () => {
+      (repository.findAndCount as jest.Mock).mockResolvedValue([[mockMerchant], 1]);
 
       const result = await service.findAll();
 
-      expect(repository.find).toHaveBeenCalledWith({
+      expect(repository.findAndCount).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
+        take: 20,
+        skip: 0,
       });
-      expect(result).toEqual([mockMerchant]);
+      expect(result).toEqual({
+        data: [mockMerchant],
+        meta: {
+          total: 1,
+          limit: 20,
+          offset: 0,
+        },
+      });
+    });
+
+    it('should respect custom limit and offset parameters', async () => {
+      (repository.findAndCount as jest.Mock).mockResolvedValue([[mockMerchant], 10]);
+
+      const result = await service.findAll({ limit: 5, offset: 5 });
+
+      expect(repository.findAndCount).toHaveBeenCalledWith({
+        order: { createdAt: 'DESC' },
+        take: 5,
+        skip: 5,
+      });
+      expect(result).toEqual({
+        data: [mockMerchant],
+        meta: {
+          total: 10,
+          limit: 5,
+          offset: 5,
+        },
+      });
     });
   });
 });

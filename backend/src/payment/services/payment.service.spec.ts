@@ -4,6 +4,7 @@ import { Repository, QueryFailedError } from 'typeorm';
 import { PaymentService } from './payment.service';
 import { Payment } from '../entities/payment.entity';
 import { PaymentStatus } from '../enums/payment-status.enum';
+import { PaymentMethodType } from '../enums/payment-method.enum';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 
@@ -11,14 +12,20 @@ describe('PaymentService', () => {
   let service: PaymentService;
   let paymentRepository: jest.Mocked<Repository<Payment>>;
 
+  let paymentProvider: jest.Mocked<any>;
+
   beforeEach(async () => {
-    const paymentRepoMock = {
+    paymentRepository = {
       create: jest.fn(),
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
       findAndCount: jest.fn(),
       update: jest.fn(),
+    } as any;
+
+    paymentProvider = {
+      process: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -26,50 +33,52 @@ describe('PaymentService', () => {
         PaymentService,
         {
           provide: getRepositoryToken(Payment),
-          useValue: paymentRepoMock,
+          useValue: paymentRepository,
+        },
+        {
+          provide: 'PAYMENT_PROVIDER',
+          useValue: paymentProvider,
         },
       ],
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);
-    paymentRepository = module.get(getRepositoryToken(Payment));
   });
 
   describe('createPayment', () => {
-    it('should create and save a payment with PENDING status', async () => {
+    it('should successfully create a payment', async () => {
       const dto: CreatePaymentDto = {
-        amount: 10000,
-        currency: 'IDR',
-        orderId: 'ORDER-123',
+        amount: 1000,
+        currency: 'USD',
+        orderId: 'ORDER123',
+        paymentMethod: PaymentMethodType.QRIS,
       };
-      const createdPayment = { id: 'payment-1', ...dto, status: PaymentStatus.PENDING };
 
-      paymentRepository.create.mockReturnValue(createdPayment as Payment);
-      paymentRepository.save.mockResolvedValue(createdPayment as Payment);
+      const payment = { ...dto, id: '1', merchantId: 'merchant-1', status: PaymentStatus.PENDING };
+
+      paymentRepository.create.mockReturnValue(payment as Payment);
+      paymentRepository.save.mockResolvedValue(payment as Payment);
 
       const result = await service.createPayment('merchant-1', dto);
 
       expect(paymentRepository.create).toHaveBeenCalledWith({
         merchantId: 'merchant-1',
-        amount: dto.amount,
-        currency: dto.currency,
-        orderId: dto.orderId,
+        amount: 1000,
+        currency: 'USD',
+        orderId: 'ORDER123',
         description: undefined,
+        paymentMethod: PaymentMethodType.QRIS,
         expiresAt: undefined,
         status: PaymentStatus.PENDING,
       });
-      expect(paymentRepository.save).toHaveBeenCalledWith(createdPayment);
-      expect(result).toEqual(createdPayment);
+      expect(paymentRepository.save).toHaveBeenCalledWith(payment);
+      expect(result).toEqual(payment);
     });
 
-    it('should throw ConflictException on duplicate order_id', async () => {
-      const dto: CreatePaymentDto = { amount: 100, currency: 'USD', orderId: 'DUP' };
-      const createdPayment = { ...dto, status: PaymentStatus.PENDING };
-      paymentRepository.create.mockReturnValue(createdPayment as Payment);
-
-      const error = new QueryFailedError('query', [], new Error());
-      (error as any).code = '23505';
-      paymentRepository.save.mockRejectedValue(error);
+    it('should throw ConflictException on duplicate orderId', async () => {
+      const dto: CreatePaymentDto = { amount: 100, currency: 'USD', orderId: 'DUP', paymentMethod: PaymentMethodType.QRIS };
+      paymentRepository.create.mockReturnValue({} as Payment);
+      paymentRepository.save.mockRejectedValue(Object.assign(new QueryFailedError('query', [], new Error()), { code: '23505' }));
 
       await expect(service.createPayment('merchant-1', dto)).rejects.toThrow(ConflictException);
     });

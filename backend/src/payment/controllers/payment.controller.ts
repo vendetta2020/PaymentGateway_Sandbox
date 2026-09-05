@@ -40,6 +40,20 @@ export class PaymentController {
     };
   }
 
+  @Post(':id/process')
+  async processPayment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    const merchantId = req.merchant.merchantId;
+    const payment = await this.paymentService.processPayment(merchantId, id);
+    
+    return {
+      status: 'success',
+      data: payment,
+    };
+  }
+
   @Get(':id')
   async getPayment(
     @Req() req: AuthenticatedRequest,

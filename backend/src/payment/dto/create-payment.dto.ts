@@ -7,9 +7,14 @@ import {
   MaxLength,
   IsOptional,
   IsDateString,
+  IsEnum,
 } from 'class-validator';
+import { PaymentMethodType } from '../enums/payment-method.enum';
 
 export class CreatePaymentDto {
+  @IsEnum(PaymentMethodType)
+  paymentMethod!: PaymentMethodType;
+
   @IsInt()
   @Min(0)
   amount!: number;

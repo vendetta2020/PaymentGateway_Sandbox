@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Merchant } from '../../merchant/entities/merchant.entity';
 import { PaymentStatus } from '../enums/payment-status.enum';
+import { PaymentMethodType } from '../enums/payment-method.enum';
 
 @Entity('payments')
 @Index('idx_payments_merchant_order', ['merchantId', 'orderId'], { unique: true })
@@ -23,6 +24,12 @@ export class Payment {
   @ManyToOne(() => Merchant)
   @JoinColumn({ name: 'merchant_id' })
   merchant!: Merchant;
+
+  @Column({ type: 'varchar', length: 50, name: 'payment_method' })
+  paymentMethod!: PaymentMethodType;
+
+  @Column({ type: 'varchar', length: 255, name: 'provider_reference', nullable: true, unique: true })
+  providerReference?: string;
 
   // Stored in minor units (e.g., cents or minimal currency unit)
   @Column({ 

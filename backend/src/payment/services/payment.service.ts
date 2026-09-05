@@ -3,18 +3,22 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
 import { Payment } from '../entities/payment.entity';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentStatus } from '../enums/payment-status.enum';
+import { PaymentProvider } from '../providers/payment-provider.interface';
 
 @Injectable()
 export class PaymentService {
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
+    @Inject('PAYMENT_PROVIDER')
+    private readonly paymentProvider: PaymentProvider,
   ) {}
 
   async createPayment(merchantId: string, dto: CreatePaymentDto): Promise<Payment> {
@@ -31,6 +35,7 @@ export class PaymentService {
       currency: dto.currency,
       orderId: dto.orderId,
       description: dto.description,
+      paymentMethod: dto.paymentMethod,
       expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
       status: PaymentStatus.PENDING,
     });
@@ -68,6 +73,37 @@ export class PaymentService {
       take: limit,
       skip: offset,
     });
+  }
+
+  async processPayment(merchantId: string, paymentId: string): Promise<Payment> {
+    const payment = await this.getPayment(merchantId, paymentId);
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new BadRequestException(`Cannot process payment from terminal state ${payment.status}`);
+    }
+
+    try {
+      const result = await this.paymentProvider.process(payment);
+      
+      const newStatus = result.status === 'SUCCESS' ? PaymentStatus.SUCCEEDED : PaymentStatus.FAILED;
+
+      const updateResult = await this.paymentRepository.update(
+        { id: paymentId, merchantId, status: PaymentStatus.PENDING },
+        { 
+          status: newStatus,
+          providerReference: result.reference
+        }
+      );
+
+      if (updateResult.affected === 0) {
+        throw new BadRequestException(`Race condition: Payment status changed while processing`);
+      }
+
+      return this.getPayment(merchantId, paymentId);
+    } catch (error) {
+      // Provider system error: Do not mark as FAILED. Keep it PENDING.
+      throw error; // Let the global exception filter handle it (500)
+    }
   }
 
   async transitionStatus(merchantId: string, paymentId: string, newStatus: PaymentStatus): Promise<Payment> {

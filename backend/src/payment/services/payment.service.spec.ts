@@ -127,29 +127,40 @@ describe('PaymentService', () => {
     it('should atomically claim PENDING→PROCESSING, call provider, and transition to SUCCEEDED', async () => {
       // Step 1: claim succeeds
       paymentRepository.update
-        .mockResolvedValueOnce({ affected: 1 } as any)   // PENDING → PROCESSING
-        .mockResolvedValueOnce({ affected: 1 } as any);  // PROCESSING → SUCCEEDED
+        .mockResolvedValueOnce({ affected: 1 } as any) // PENDING → PROCESSING
+        .mockResolvedValueOnce({ affected: 1 } as any); // PROCESSING → SUCCEEDED
 
-      const processingPayment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING } as Payment;
-      const succeededPayment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.SUCCEEDED, providerReference: 'sim_succ_abc' } as Payment;
+      const processingPayment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.PROCESSING,
+      } as Payment;
+      const succeededPayment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.SUCCEEDED,
+        providerReference: 'sim_succ_abc',
+      } as Payment;
 
       paymentRepository.findOne
-        .mockResolvedValueOnce(processingPayment)   // getPayment for provider
-        .mockResolvedValueOnce(succeededPayment);   // getPayment for return
+        .mockResolvedValueOnce(processingPayment) // getPayment for provider
+        .mockResolvedValueOnce(succeededPayment); // getPayment for return
 
       paymentProvider.process.mockResolvedValue({ status: 'SUCCESS', reference: 'sim_succ_abc' });
 
       const result = await service.processPayment('merchant-1', 'pay-1');
 
       // Verify atomic claim: PENDING → PROCESSING
-      expect(paymentRepository.update).toHaveBeenNthCalledWith(1,
+      expect(paymentRepository.update).toHaveBeenNthCalledWith(
+        1,
         { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PENDING },
         { status: PaymentStatus.PROCESSING },
       );
       // Verify provider was called
       expect(paymentProvider.process).toHaveBeenCalledWith(processingPayment);
       // Verify final transition: PROCESSING → SUCCEEDED
-      expect(paymentRepository.update).toHaveBeenNthCalledWith(2,
+      expect(paymentRepository.update).toHaveBeenNthCalledWith(
+        2,
         { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING },
         { status: PaymentStatus.SUCCEEDED, providerReference: 'sim_succ_abc' },
       );
@@ -158,11 +169,20 @@ describe('PaymentService', () => {
 
     it('should transition to FAILED when provider returns FAILED', async () => {
       paymentRepository.update
-        .mockResolvedValueOnce({ affected: 1 } as any)   // PENDING → PROCESSING
-        .mockResolvedValueOnce({ affected: 1 } as any);  // PROCESSING → FAILED
+        .mockResolvedValueOnce({ affected: 1 } as any) // PENDING → PROCESSING
+        .mockResolvedValueOnce({ affected: 1 } as any); // PROCESSING → FAILED
 
-      const processingPayment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING } as Payment;
-      const failedPayment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.FAILED, providerReference: 'sim_fail_xyz' } as Payment;
+      const processingPayment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.PROCESSING,
+      } as Payment;
+      const failedPayment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.FAILED,
+        providerReference: 'sim_fail_xyz',
+      } as Payment;
 
       paymentRepository.findOne
         .mockResolvedValueOnce(processingPayment)
@@ -172,7 +192,8 @@ describe('PaymentService', () => {
 
       const result = await service.processPayment('merchant-1', 'pay-1');
 
-      expect(paymentRepository.update).toHaveBeenNthCalledWith(2,
+      expect(paymentRepository.update).toHaveBeenNthCalledWith(
+        2,
         { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING },
         { status: PaymentStatus.FAILED, providerReference: 'sim_fail_xyz' },
       );
@@ -181,19 +202,26 @@ describe('PaymentService', () => {
 
     it('should revert PROCESSING→PENDING on provider system error and rethrow', async () => {
       paymentRepository.update
-        .mockResolvedValueOnce({ affected: 1 } as any)   // PENDING → PROCESSING
-        .mockResolvedValueOnce({ affected: 1 } as any);  // PROCESSING → PENDING (revert)
+        .mockResolvedValueOnce({ affected: 1 } as any) // PENDING → PROCESSING
+        .mockResolvedValueOnce({ affected: 1 } as any); // PROCESSING → PENDING (revert)
 
-      const processingPayment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING } as Payment;
+      const processingPayment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.PROCESSING,
+      } as Payment;
       paymentRepository.findOne.mockResolvedValueOnce(processingPayment);
 
       const systemError = new Error('Provider connection timeout');
       paymentProvider.process.mockRejectedValue(systemError);
 
-      await expect(service.processPayment('merchant-1', 'pay-1')).rejects.toThrow('Provider connection timeout');
+      await expect(service.processPayment('merchant-1', 'pay-1')).rejects.toThrow(
+        'Provider connection timeout',
+      );
 
       // Verify revert: PROCESSING → PENDING
-      expect(paymentRepository.update).toHaveBeenNthCalledWith(2,
+      expect(paymentRepository.update).toHaveBeenNthCalledWith(
+        2,
         { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PROCESSING },
         { status: PaymentStatus.PENDING },
       );
@@ -202,10 +230,16 @@ describe('PaymentService', () => {
     it('should throw BadRequestException when claim fails (race condition / non-PENDING)', async () => {
       paymentRepository.update.mockResolvedValue({ affected: 0 } as any);
 
-      const payment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.SUCCEEDED } as Payment;
+      const payment = {
+        id: 'pay-1',
+        merchantId: 'merchant-1',
+        status: PaymentStatus.SUCCEEDED,
+      } as Payment;
       paymentRepository.findOne.mockResolvedValue(payment);
 
-      await expect(service.processPayment('merchant-1', 'pay-1')).rejects.toThrow(BadRequestException);
+      await expect(service.processPayment('merchant-1', 'pay-1')).rejects.toThrow(
+        BadRequestException,
+      );
 
       // Verify provider was NEVER called
       expect(paymentProvider.process).not.toHaveBeenCalled();
@@ -215,7 +249,9 @@ describe('PaymentService', () => {
       paymentRepository.update.mockResolvedValue({ affected: 0 } as any);
       paymentRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.processPayment('merchant-1', 'nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.processPayment('merchant-1', 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
       expect(paymentProvider.process).not.toHaveBeenCalled();
     });
   });

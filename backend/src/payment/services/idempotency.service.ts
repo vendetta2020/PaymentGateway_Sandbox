@@ -76,7 +76,9 @@ export class IdempotencyService {
 
             if (existing) {
               if (existing.requestHash !== requestHash) {
-                throw new ConflictException('Idempotency key used with a different request payload');
+                throw new ConflictException(
+                  'Idempotency key used with a different request payload',
+                );
               }
               if (existing.responseStatus != null) {
                 return { status: existing.responseStatus, body: existing.responseBody };

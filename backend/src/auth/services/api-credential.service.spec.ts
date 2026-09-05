@@ -92,7 +92,8 @@ describe('ApiCredentialService', () => {
       // Verify with tampered secret
       const lastChar = plaintextSecret.slice(-1);
       const replacementChar = lastChar === 'a' ? 'b' : 'a';
-      const tamperedSecret = plaintextSecret.substring(0, plaintextSecret.length - 1) + replacementChar;
+      const tamperedSecret =
+        plaintextSecret.substring(0, plaintextSecret.length - 1) + replacementChar;
       const isValid = service.verifySecret(tamperedSecret, (savedDto as ApiCredential).secretHash);
       expect(isValid).toBe(false);
     });

@@ -21,7 +21,11 @@ export class PaymentService {
     private readonly paymentProvider: PaymentProvider,
   ) {}
 
-  async createPayment(merchantId: string, dto: CreatePaymentDto, manager?: EntityManager): Promise<Payment> {
+  async createPayment(
+    merchantId: string,
+    dto: CreatePaymentDto,
+    manager?: EntityManager,
+  ): Promise<Payment> {
     const repo = manager ? manager.getRepository(Payment) : this.paymentRepository;
 
     if (dto.expiresAt) {
@@ -52,7 +56,11 @@ export class PaymentService {
     }
   }
 
-  async getPayment(merchantId: string, paymentId: string, manager?: EntityManager): Promise<Payment> {
+  async getPayment(
+    merchantId: string,
+    paymentId: string,
+    manager?: EntityManager,
+  ): Promise<Payment> {
     const repo = manager ? manager.getRepository(Payment) : this.paymentRepository;
     const payment = await repo.findOne({
       where: { id: paymentId, merchantId },
@@ -78,7 +86,11 @@ export class PaymentService {
     });
   }
 
-  async processPayment(merchantId: string, paymentId: string, manager?: EntityManager): Promise<Payment> {
+  async processPayment(
+    merchantId: string,
+    paymentId: string,
+    manager?: EntityManager,
+  ): Promise<Payment> {
     const repo = manager ? manager.getRepository(Payment) : this.paymentRepository;
 
     // Step 1: Atomically claim the payment by transitioning PENDING → PROCESSING.
@@ -129,7 +141,7 @@ export class PaymentService {
     merchantId: string,
     paymentId: string,
     newStatus: PaymentStatus,
-    manager?: EntityManager
+    manager?: EntityManager,
   ): Promise<Payment> {
     const repo = manager ? manager.getRepository(Payment) : this.paymentRepository;
 

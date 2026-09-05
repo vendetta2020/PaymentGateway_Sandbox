@@ -29,7 +29,7 @@ describe('IdempotencyService', () => {
 
     idempotencyRepository = {
       findOne: jest.fn(),
-      create: jest.fn().mockImplementation(dto => dto),
+      create: jest.fn().mockImplementation((dto) => dto),
     } as any;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -84,30 +84,35 @@ describe('IdempotencyService', () => {
 
   it('should execute operation and save idempotency key if not exists', async () => {
     idempotencyRepository.findOne.mockResolvedValue(null);
-    
+
     let executed = false;
     const result = await service.executeIdempotent(
-      'm1', 'k1', 'hash1', '/path',
+      'm1',
+      'k1',
+      'hash1',
+      '/path',
       async (manager) => {
         executed = true;
         expect(manager).toBe(queryRunner.manager);
         return { status: 201, body: { data: 'created' } };
-      }
+      },
     );
 
     expect(executed).toBe(true);
     expect(queryRunner.startTransaction).toHaveBeenCalled();
     expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
-    expect(queryRunner.manager.save).toHaveBeenLastCalledWith(expect.objectContaining({
-      merchantId: 'm1',
-      key: 'k1',
-      requestHash: 'hash1',
-      responseStatus: 201,
-      responseBody: { data: 'created' },
-    }));
+    expect(queryRunner.manager.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        merchantId: 'm1',
+        key: 'k1',
+        requestHash: 'hash1',
+        responseStatus: 201,
+        responseBody: { data: 'created' },
+      }),
+    );
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
     expect(queryRunner.release).toHaveBeenCalled();
-    
+
     expect(result.status).toBe(201);
     expect(result.body).toEqual({ data: 'created' });
   });
@@ -115,7 +120,8 @@ describe('IdempotencyService', () => {
   it('should rollback and return cached response if concurrent transaction commits first (23505)', async () => {
     idempotencyRepository.findOne
       .mockResolvedValueOnce(null) // first check
-      .mockResolvedValueOnce({       // check after concurrent commit
+      .mockResolvedValueOnce({
+        // check after concurrent commit
         requestHash: 'hash1',
         responseStatus: 201,
         responseBody: { data: 'concurrent-success' },
@@ -128,23 +134,21 @@ describe('IdempotencyService', () => {
 
     queryRunner.manager.save.mockRejectedValue(uniqueError);
 
-    const result = await service.executeIdempotent(
-      'm1', 'k1', 'hash1', '/path',
-      async () => ({ status: 201, body: { data: 'my-success' } })
-    );
+    const result = await service.executeIdempotent('m1', 'k1', 'hash1', '/path', async () => ({
+      status: 201,
+      body: { data: 'my-success' },
+    }));
 
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
     expect(result.body).toEqual({ data: 'concurrent-success' });
   });
 
   it('should rollback and throw ConflictException if concurrent transaction had DIFFERENT payload', async () => {
-    idempotencyRepository.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        requestHash: 'differentHash',
-        responseStatus: 201,
-        responseBody: { data: 'other-data' },
-      } as IdempotencyKey);
+    idempotencyRepository.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      requestHash: 'differentHash',
+      responseStatus: 201,
+      responseBody: { data: 'other-data' },
+    } as IdempotencyKey);
 
     const uniqueError = Object.assign(new QueryFailedError('query', [], new Error()), {
       code: '23505',
@@ -154,10 +158,10 @@ describe('IdempotencyService', () => {
     queryRunner.manager.save.mockRejectedValue(uniqueError);
 
     await expect(
-      service.executeIdempotent(
-        'm1', 'k1', 'hash1', '/path',
-        async () => ({ status: 201, body: 'ok' })
-      )
+      service.executeIdempotent('m1', 'k1', 'hash1', '/path', async () => ({
+        status: 201,
+        body: 'ok',
+      })),
     ).rejects.toThrow(ConflictException);
   });
 
@@ -167,10 +171,9 @@ describe('IdempotencyService', () => {
     const businessError = new Error('Business error');
 
     await expect(
-      service.executeIdempotent(
-        'm1', 'k1', 'hash1', '/path',
-        async () => { throw businessError; }
-      )
+      service.executeIdempotent('m1', 'k1', 'hash1', '/path', async () => {
+        throw businessError;
+      }),
     ).rejects.toThrow(businessError);
 
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();

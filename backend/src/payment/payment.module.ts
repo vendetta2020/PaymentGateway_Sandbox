@@ -8,9 +8,10 @@ import { PaymentController } from './controllers/payment.controller';
 import { InternalPaymentController } from './controllers/internal-payment.controller';
 import { SimulatedPaymentProvider } from './providers/simulated-payment.provider';
 import { AuthModule } from '../auth/auth.module';
+import { WebhookModule } from '../webhook/webhook.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment, IdempotencyKey]), AuthModule],
+  imports: [TypeOrmModule.forFeature([Payment, IdempotencyKey]), AuthModule, WebhookModule],
   controllers: [PaymentController, InternalPaymentController],
   providers: [
     PaymentService,

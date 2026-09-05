@@ -21,6 +21,8 @@ const configSchema = Joi.object({
   // Features
   ALLOW_DEV_CREDENTIAL_PROVISIONING: Joi.boolean().default(false),
   ALLOW_DEV_PAYMENT_SIMULATION: Joi.boolean().default(false),
+  ALLOW_DEV_WEBHOOK_DELIVERY: Joi.boolean().default(false),
+  ALLOW_DEV_LOCAL_WEBHOOKS: Joi.boolean().default(false),
 });
 
 /**

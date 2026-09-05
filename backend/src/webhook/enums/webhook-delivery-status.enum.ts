@@ -1,0 +1,7 @@
+export enum WebhookDeliveryStatus {
+  PENDING = 'PENDING',
+  DELIVERING = 'DELIVERING',
+  DELIVERED = 'DELIVERED',
+  FAILED = 'FAILED',
+  EXHAUSTED = 'EXHAUSTED',
+}

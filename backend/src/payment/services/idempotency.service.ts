@@ -105,7 +105,7 @@ export class IdempotencyService {
     } catch (error) {
       try {
         await queryRunner.rollbackTransaction();
-      } catch (_) {
+      } catch {
         // transaction may have already rolled back
       }
       throw error;

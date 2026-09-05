@@ -4,6 +4,8 @@ import {
   ConflictException,
   BadRequestException,
   Inject,
+  Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError, EntityManager } from 'typeorm';
@@ -11,14 +13,23 @@ import { Payment } from '../entities/payment.entity';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentProvider } from '../providers/payment-provider.interface';
+import { WebhookEventService } from '../../webhook/services/webhook-event.service';
+import { WebhookDeliveryService } from '../../webhook/services/webhook-delivery.service';
+import { WebhookEventType } from '../../webhook/enums/webhook-event-type.enum';
 
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
     @Inject('PAYMENT_PROVIDER')
     private readonly paymentProvider: PaymentProvider,
+    @Optional()
+    private readonly webhookEventService?: WebhookEventService,
+    @Optional()
+    private readonly webhookDeliveryService?: WebhookDeliveryService,
   ) {}
 
   async createPayment(
@@ -47,7 +58,19 @@ export class PaymentService {
     });
 
     try {
-      return await repo.save(payment);
+      const saved = await repo.save(payment);
+
+      if (this.webhookEventService) {
+        const deliveryIds = await this.webhookEventService.recordPaymentEvent(
+          merchantId,
+          saved,
+          WebhookEventType.PAYMENT_CREATED,
+          manager,
+        );
+        this.dispatchDeliveriesAsync(deliveryIds);
+      }
+
+      return saved;
     } catch (error) {
       if (error instanceof QueryFailedError && (error as any).code === '23505') {
         throw new ConflictException(`Order ID ${dto.orderId} already exists for this merchant`);
@@ -125,7 +148,24 @@ export class PaymentService {
         },
       );
 
-      return this.getPayment(merchantId, paymentId, manager);
+      const updatedPayment = await this.getPayment(merchantId, paymentId, manager);
+
+      if (this.webhookEventService) {
+        const eventType =
+          newStatus === PaymentStatus.SUCCEEDED
+            ? WebhookEventType.PAYMENT_SUCCEEDED
+            : WebhookEventType.PAYMENT_FAILED;
+
+        const deliveryIds = await this.webhookEventService.recordPaymentEvent(
+          merchantId,
+          updatedPayment,
+          eventType,
+          manager,
+        );
+        this.dispatchDeliveriesAsync(deliveryIds);
+      }
+
+      return updatedPayment;
     } catch (error) {
       // Provider system/infrastructure error: revert PROCESSING → PENDING
       // so the payment can be retried later.
@@ -160,6 +200,43 @@ export class PaymentService {
       throw new BadRequestException(`Cannot transition from terminal state ${payment.status}`);
     }
 
-    return this.getPayment(merchantId, paymentId, manager);
+    const updatedPayment = await this.getPayment(merchantId, paymentId, manager);
+
+    if (this.webhookEventService) {
+      let eventType: WebhookEventType | null = null;
+      if (newStatus === PaymentStatus.SUCCEEDED) {
+        eventType = WebhookEventType.PAYMENT_SUCCEEDED;
+      } else if (newStatus === PaymentStatus.FAILED) {
+        eventType = WebhookEventType.PAYMENT_FAILED;
+      }
+
+      if (eventType) {
+        const deliveryIds = await this.webhookEventService.recordPaymentEvent(
+          merchantId,
+          updatedPayment,
+          eventType,
+          manager,
+        );
+        this.dispatchDeliveriesAsync(deliveryIds);
+      }
+    }
+
+    return updatedPayment;
+  }
+
+  private dispatchDeliveriesAsync(deliveryIds: string[]): void {
+    if (!deliveryIds || deliveryIds.length === 0 || !this.webhookDeliveryService) return;
+
+    // Dispatched shortly after current turn.
+    // At this point, the database transaction has committed.
+    setTimeout(async () => {
+      for (const id of deliveryIds) {
+        try {
+          await this.webhookDeliveryService!.deliver(id);
+        } catch (error: any) {
+          this.logger.error(`Asynchronous webhook delivery error for ${id}: ${error.message}`);
+        }
+      }
+    }, 50);
   }
 }

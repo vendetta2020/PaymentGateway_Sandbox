@@ -6,6 +6,7 @@ import { HealthModule } from './health/health.module';
 import { MerchantModule } from './merchant/merchant.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentModule } from './payment/payment.module';
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PaymentModule } from './payment/payment.module';
     MerchantModule,
     AuthModule,
     PaymentModule,
+    WebhookModule,
   ],
 })
 export class AppModule {}

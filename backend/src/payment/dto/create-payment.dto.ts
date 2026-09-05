@@ -1,4 +1,13 @@
-import { IsInt, Min, IsString, IsUppercase, Length, MaxLength, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsInt,
+  Min,
+  IsString,
+  IsUppercase,
+  Length,
+  MaxLength,
+  IsOptional,
+  IsDateString,
+} from 'class-validator';
 
 export class CreatePaymentDto {
   @IsInt()

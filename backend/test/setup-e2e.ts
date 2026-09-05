@@ -17,3 +17,4 @@ setDefault('DB_USERNAME', 'paymentgw');
 setDefault('DB_PASSWORD', 'paymentgw_secret');
 setDefault('DB_NAME', 'payment_gateway_test');
 setDefault('ALLOW_DEV_CREDENTIAL_PROVISIONING', 'true');
+setDefault('ALLOW_DEV_PAYMENT_SIMULATION', 'true');

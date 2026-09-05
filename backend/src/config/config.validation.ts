@@ -20,6 +20,7 @@ const configSchema = Joi.object({
 
   // Features
   ALLOW_DEV_CREDENTIAL_PROVISIONING: Joi.boolean().default(false),
+  ALLOW_DEV_PAYMENT_SIMULATION: Joi.boolean().default(false),
 });
 
 /**

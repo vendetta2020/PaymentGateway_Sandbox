@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
 import { Payment } from '../entities/payment.entity';
@@ -13,6 +18,13 @@ export class PaymentService {
   ) {}
 
   async createPayment(merchantId: string, dto: CreatePaymentDto): Promise<Payment> {
+    if (dto.expiresAt) {
+      const expiresDate = new Date(dto.expiresAt);
+      if (expiresDate.getTime() <= Date.now()) {
+        throw new BadRequestException('expiresAt must be in the future');
+      }
+    }
+
     const payment = this.paymentRepository.create({
       merchantId,
       amount: dto.amount,
@@ -45,25 +57,35 @@ export class PaymentService {
     return payment;
   }
 
-  async listPayments(merchantId: string): Promise<Payment[]> {
-    return this.paymentRepository.find({
+  async listPayments(
+    merchantId: string, 
+    limit: number = 10, 
+    offset: number = 0
+  ): Promise<[Payment[], number]> {
+    return this.paymentRepository.findAndCount({
       where: { merchantId },
       order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
     });
   }
 
   async transitionStatus(merchantId: string, paymentId: string, newStatus: PaymentStatus): Promise<Payment> {
-    const payment = await this.getPayment(merchantId, paymentId);
-
-    if (payment.status !== PaymentStatus.PENDING) {
-      throw new BadRequestException(`Cannot transition from terminal state ${payment.status}`);
-    }
-
     if (newStatus === PaymentStatus.PENDING) {
       throw new BadRequestException(`Cannot transition to ${PaymentStatus.PENDING}`);
     }
 
-    payment.status = newStatus;
-    return this.paymentRepository.save(payment);
+    const result = await this.paymentRepository.update(
+      { id: paymentId, merchantId, status: PaymentStatus.PENDING },
+      { status: newStatus }
+    );
+
+    if (result.affected === 0) {
+      const payment = await this.getPayment(merchantId, paymentId);
+      // If we reach here, the payment exists and belongs to the merchant, but status was not PENDING
+      throw new BadRequestException(`Cannot transition from terminal state ${payment.status}`);
+    }
+
+    return this.getPayment(merchantId, paymentId);
   }
 }

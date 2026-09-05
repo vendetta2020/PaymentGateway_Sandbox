@@ -25,7 +25,13 @@ export class Payment {
   merchant!: Merchant;
 
   // Stored in minor units (e.g., cents or minimal currency unit)
-  @Column({ type: 'int' })
+  @Column({ 
+    type: 'bigint',
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string) => parseInt(value, 10),
+    }
+  })
   amount!: number;
 
   @Column({ type: 'varchar', length: 3 })

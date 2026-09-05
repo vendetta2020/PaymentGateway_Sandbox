@@ -15,10 +15,10 @@ describe('PaymentModule (e2e)', () => {
   let merchantRepository: Repository<Merchant>;
   let paymentRepository: Repository<Payment>;
   let apiCredentialService: ApiCredentialService;
-  
+
   let merchantAId: string;
   let secretA: string;
-  
+
   let merchantBId: string;
   let secretB: string;
 
@@ -45,22 +45,32 @@ describe('PaymentModule (e2e)', () => {
     apiCredentialService = moduleFixture.get<ApiCredentialService>(ApiCredentialService);
 
     await paymentRepository.query('DELETE FROM payments');
-    const apiCredRepo = moduleFixture.get<Repository<ApiCredential>>(getRepositoryToken(ApiCredential));
+    const apiCredRepo = moduleFixture.get<Repository<ApiCredential>>(
+      getRepositoryToken(ApiCredential),
+    );
     await apiCredRepo.query('DELETE FROM api_credentials');
     await merchantRepository.query('DELETE FROM merchants');
 
     // Create Merchant A
-    const mA = await merchantRepository.save(merchantRepository.create({
-      name: 'Merchant A', businessName: 'Business A', email: 'a@example.com'
-    }));
+    const mA = await merchantRepository.save(
+      merchantRepository.create({
+        name: 'Merchant A',
+        businessName: 'Business A',
+        email: 'a@example.com',
+      }),
+    );
     merchantAId = mA.id;
     const credA = await apiCredentialService.createCredential(merchantAId);
     secretA = credA.plaintextSecret;
 
     // Create Merchant B
-    const mB = await merchantRepository.save(merchantRepository.create({
-      name: 'Merchant B', businessName: 'Business B', email: 'b@example.com'
-    }));
+    const mB = await merchantRepository.save(
+      merchantRepository.create({
+        name: 'Merchant B',
+        businessName: 'Business B',
+        email: 'b@example.com',
+      }),
+    );
     merchantBId = mB.id;
     const credB = await apiCredentialService.createCredential(merchantBId);
     secretB = credB.plaintextSecret;
@@ -95,7 +105,7 @@ describe('PaymentModule (e2e)', () => {
       expect(response.body.data.id).toBeDefined();
       expect(response.body.data.status).toBe(PaymentStatus.PENDING);
       expect(response.body.data.amount).toBe(10000);
-      
+
       paymentAId = response.body.data.id;
     });
 
@@ -113,7 +123,7 @@ describe('PaymentModule (e2e)', () => {
         .set('Authorization', `Bearer ${secretB}`)
         .send({ amount: 5000, currency: 'IDR', orderId: 'ORD-1' })
         .expect(201);
-      
+
       expect(response.body.status).toBe('success');
     });
 
@@ -138,7 +148,7 @@ describe('PaymentModule (e2e)', () => {
         .get('/api/v1/payments')
         .set('Authorization', `Bearer ${secretA}`)
         .expect(200);
-      
+
       expect(responseA.body.data).toHaveLength(1);
       expect(responseA.body.data[0].id).toBe(paymentAId);
     });
@@ -149,7 +159,7 @@ describe('PaymentModule (e2e)', () => {
         .set('Authorization', `Bearer ${secretA}`)
         .send({ status: PaymentStatus.SUCCEEDED })
         .expect(201);
-      
+
       expect(response.body.data.status).toBe(PaymentStatus.SUCCEEDED);
     });
 

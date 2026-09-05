@@ -17,6 +17,8 @@ describe('PaymentService', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
+      findAndCount: jest.fn(),
+      update: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,12 +43,12 @@ describe('PaymentService', () => {
         orderId: 'ORDER-123',
       };
       const createdPayment = { id: 'payment-1', ...dto, status: PaymentStatus.PENDING };
-      
+
       paymentRepository.create.mockReturnValue(createdPayment as Payment);
       paymentRepository.save.mockResolvedValue(createdPayment as Payment);
 
       const result = await service.createPayment('merchant-1', dto);
-      
+
       expect(paymentRepository.create).toHaveBeenCalledWith({
         merchantId: 'merchant-1',
         amount: dto.amount,
@@ -64,7 +66,7 @@ describe('PaymentService', () => {
       const dto: CreatePaymentDto = { amount: 100, currency: 'USD', orderId: 'DUP' };
       const createdPayment = { ...dto, status: PaymentStatus.PENDING };
       paymentRepository.create.mockReturnValue(createdPayment as Payment);
-      
+
       const error = new QueryFailedError('query', [], new Error());
       (error as any).code = '23505';
       paymentRepository.save.mockRejectedValue(error);
@@ -89,30 +91,38 @@ describe('PaymentService', () => {
   });
 
   describe('listPayments', () => {
-    it('should return list of payments for the merchant', async () => {
+    it('should return list of payments and count for the merchant', async () => {
       const payments = [{ id: '1' }, { id: '2' }];
-      paymentRepository.find.mockResolvedValue(payments as Payment[]);
+      paymentRepository.findAndCount.mockResolvedValue([payments as Payment[], 2]);
 
-      const result = await service.listPayments('merchant-1');
-      expect(paymentRepository.find).toHaveBeenCalledWith({
+      const [result, count] = await service.listPayments('merchant-1', 10, 0);
+      expect(paymentRepository.findAndCount).toHaveBeenCalledWith({
         where: { merchantId: 'merchant-1' },
         order: { createdAt: 'DESC' },
+        take: 10,
+        skip: 0,
       });
       expect(result).toEqual(payments);
+      expect(count).toBe(2);
     });
   });
 
   describe('transitionStatus', () => {
     it('should transition status from PENDING to SUCCEEDED', async () => {
-      const payment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PENDING };
+      paymentRepository.update.mockResolvedValue({ affected: 1 } as any);
+      const payment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.SUCCEEDED };
       paymentRepository.findOne.mockResolvedValue(payment as Payment);
-      paymentRepository.save.mockResolvedValue({ ...payment, status: PaymentStatus.SUCCEEDED } as Payment);
 
       const result = await service.transitionStatus('merchant-1', 'pay-1', PaymentStatus.SUCCEEDED);
+      expect(paymentRepository.update).toHaveBeenCalledWith(
+        { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PENDING },
+        { status: PaymentStatus.SUCCEEDED }
+      );
       expect(result.status).toBe(PaymentStatus.SUCCEEDED);
     });
 
     it('should throw BadRequestException if current status is terminal', async () => {
+      paymentRepository.update.mockResolvedValue({ affected: 0 } as any);
       const payment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.SUCCEEDED };
       paymentRepository.findOne.mockResolvedValue(payment as Payment);
 
@@ -120,9 +130,6 @@ describe('PaymentService', () => {
     });
 
     it('should throw BadRequestException if new status is PENDING', async () => {
-      const payment = { id: 'pay-1', merchantId: 'merchant-1', status: PaymentStatus.PENDING };
-      paymentRepository.findOne.mockResolvedValue(payment as Payment);
-
       await expect(service.transitionStatus('merchant-1', 'pay-1', PaymentStatus.PENDING)).rejects.toThrow(BadRequestException);
     });
   });

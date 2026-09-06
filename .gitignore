@@ -4,10 +4,13 @@ node_modules/
 # Build
 dist/
 build/
+.next/
+out/
 *.tsbuildinfo
 
 # Environment
 .env
+.env*.local
 !.env.example
 !.env.test
 

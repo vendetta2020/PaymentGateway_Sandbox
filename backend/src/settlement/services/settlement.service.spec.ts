@@ -133,8 +133,8 @@ describe('SettlementService', () => {
       expect(paymentRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('should ensure net amount is non-negative even if refunds exceed payments in the period', async () => {
-      setupMocks(20000, 50000); // 20k payments, 50k refunds -> net amount clamped to 0
+    it('should calculate negative net amount when refunds exceed gross payments in cross-period refund scenario', async () => {
+      setupMocks(20000, 50000); // 20k payments, 50k refunds -> net amount -30000
       settlementRepo.findOne.mockResolvedValue(null);
 
       const result = await service.createSettlement(merchantId, {
@@ -144,7 +144,7 @@ describe('SettlementService', () => {
 
       expect(result.grossAmount).toBe(20000);
       expect(result.refundAmount).toBe(50000);
-      expect(result.netAmount).toBe(0);
+      expect(result.netAmount).toBe(-30000);
     });
   });
 

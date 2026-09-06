@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Merchant } from '../src/merchant/entities/merchant.entity';
 import { ApiCredentialService } from '../src/auth/services/api-credential.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -241,6 +241,63 @@ describe('SettlementModule (e2e)', () => {
 
       expect(resB.body.data.id).not.toBe(stlAId);
       expect(resB.body.data.merchantId).toBe(merchantBId);
+    });
+
+    it('should correctly calculate negative net amount on cross-period refund (DEFECT-001 regression test)', async () => {
+      // 1. Create and process a payment for Merchant B
+      const payRes = await request(app.getHttpServer())
+        .post('/api/v1/payments')
+        .set('Authorization', `Bearer ${secretB}`)
+        .set('Idempotency-Key', `idem_cpr_p_${crypto.randomUUID()}`)
+        .send({
+          amount: 100000,
+          currency: 'IDR',
+          orderId: `ord_cpr_${crypto.randomUUID().substring(0, 6)}`,
+          paymentMethod: PaymentMethodType.QRIS,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/payments/${payRes.body.data.id}/process`)
+        .set('Authorization', `Bearer ${secretB}`)
+        .set('Idempotency-Key', `idem_cpr_proc_${crypto.randomUUID()}`)
+        .expect(201);
+
+      // 2. Move payment's created_at to 48 hours ago (Day 1)
+      const ds = app.get(DataSource);
+      const pastDate = new Date(Date.now() - 48 * 3600 * 1000);
+      await ds.query(`UPDATE payments SET created_at = $1 WHERE id = $2`, [
+        pastDate,
+        payRes.body.data.id,
+      ]);
+
+      // 3. Issue full refund of 100,000 IDR (Day 2)
+      await request(app.getHttpServer())
+        .post(`/api/v1/payments/${payRes.body.data.id}/refunds`)
+        .set('Authorization', `Bearer ${secretB}`)
+        .set('Idempotency-Key', `idem_cpr_ref_${crypto.randomUUID()}`)
+        .send({ amount: 100000, reason: 'Cross-period refund test' })
+        .expect(201);
+
+      // 4. Generate Day 2 settlement (period covering only the last 1 hour)
+      const day2Start = new Date(Date.now() - 3600 * 1000).toISOString();
+      const day2End = new Date(Date.now() + 3600 * 1000).toISOString();
+
+      const stlRes = await request(app.getHttpServer())
+        .post('/api/v1/settlements')
+        .set('Authorization', `Bearer ${secretB}`)
+        .send({
+          periodStart: day2Start,
+          periodEnd: day2End,
+          currency: 'IDR',
+        })
+        .expect(201);
+
+      const stl = stlRes.body.data;
+      expect(stl.grossAmount).toBe(0);
+      expect(stl.refundAmount).toBe(100000);
+      expect(stl.netAmount).toBe(-100000);
+      expect(stl.status).toBe(SettlementStatus.PENDING);
     });
   });
 

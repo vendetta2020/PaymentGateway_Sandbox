@@ -83,8 +83,8 @@ export class SettlementService {
 
     const refundAmount = parseInt(refundSumResult.total, 10);
 
-    // 4. Calculate net amount with non-negative lower bound
-    const netAmount = Math.max(0, grossAmount - refundAmount);
+    // 4. Calculate net amount (can be negative when cross-period refunds exceed period gross)
+    const netAmount = grossAmount - refundAmount;
 
     const settlementReference = `stl_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
 

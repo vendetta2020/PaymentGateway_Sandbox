@@ -21,7 +21,7 @@ export class CreateSettlementAndReconciliationTables1788640000000 implements Mig
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         CONSTRAINT "chk_settlements_status" CHECK (status IN ('PENDING', 'PROCESSING', 'SETTLED', 'FAILED')),
-        CONSTRAINT "chk_settlements_amounts" CHECK (gross_amount >= 0 AND refund_amount >= 0 AND net_amount >= 0),
+        CONSTRAINT "chk_settlements_amounts" CHECK (gross_amount >= 0 AND refund_amount >= 0),
         CONSTRAINT "chk_settlements_currency" CHECK (length(currency) = 3),
         CONSTRAINT "chk_settlements_period" CHECK (period_end >= period_start),
         CONSTRAINT "UQ_settlements_reference" UNIQUE ("settlement_reference"),

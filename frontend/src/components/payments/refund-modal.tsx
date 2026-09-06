@@ -23,12 +23,8 @@ export function RefundModal({
   onClose,
   onSuccess,
 }: RefundModalProps) {
-  // Calculate refundable balance strictly based on backend response data
-  const successfulRefundsTotal = existingRefunds
-    .filter((r) => r.status === 'SUCCESS')
-    .reduce((sum, r) => sum + r.amount, 0);
-
-  const maxRefundable = Math.max(0, payment.amount - successfulRefundsTotal);
+  const successfulRefundsTotal = payment.totalRefunded ?? 0;
+  const maxRefundable = payment.refundableAmount ?? payment.amount;
 
   const [amount, setAmount] = useState(maxRefundable.toString());
   const [reason, setReason] = useState('Customer requested refund');

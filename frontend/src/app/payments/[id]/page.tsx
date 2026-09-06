@@ -130,11 +130,8 @@ export default function PaymentDetailPage() {
 
   if (!payment) return null;
 
-  const totalRefunded = refunds
-    .filter((r) => r.status === 'SUCCESS')
-    .reduce((acc, r) => acc + r.amount, 0);
-
-  const remainingBalance = Math.max(0, payment.amount - totalRefunded);
+  const totalRefunded = payment.totalRefunded ?? 0;
+  const remainingBalance = payment.refundableAmount ?? payment.amount;
 
   return (
     <div className="space-y-6">

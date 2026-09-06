@@ -60,7 +60,7 @@ export default function ApiCredentialsPage() {
         status: string;
         data: ProvisionedKeyResult;
         message: string;
-      }>(`/internal/merchants/${merchant.id}/api-credentials`);
+      }>(`/api-credentials`);
 
       if (response?.data) {
         setNewKeyModalData(response.data);

@@ -146,7 +146,7 @@ export class PaymentController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ) {
     const merchantId = req.merchant.merchantId;
-    const payment = await this.paymentService.getPayment(merchantId, id);
+    const payment = await this.paymentService.getPaymentWithRefundBalance(merchantId, id);
 
     return {
       status: 'success',

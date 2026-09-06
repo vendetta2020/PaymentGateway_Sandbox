@@ -96,6 +96,26 @@ export class PaymentService {
     return payment;
   }
 
+  async getPaymentWithRefundBalance(
+    merchantId: string,
+    paymentId: string,
+  ): Promise<Payment & { totalRefunded: number; refundableAmount: number }> {
+    const payment = await this.getPayment(merchantId, paymentId);
+
+    const sumResult = await this.paymentRepository.query(
+      `SELECT COALESCE(SUM(amount), 0) AS "totalRefunded" FROM refunds WHERE payment_id = $1 AND merchant_id = $2 AND status IN ('PENDING', 'SUCCESS')`,
+      [paymentId, merchantId],
+    );
+
+    const totalRefunded = parseInt(sumResult[0].totalRefunded, 10);
+    const refundableAmount = Math.max(0, Number(payment.amount) - totalRefunded);
+
+    return Object.assign(payment, {
+      totalRefunded,
+      refundableAmount,
+    });
+  }
+
   async listPayments(
     merchantId: string,
     limit: number = 10,

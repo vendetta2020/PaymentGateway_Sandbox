@@ -23,6 +23,8 @@ describe('RefundModal', () => {
     providerReference: 'sim_123',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    totalRefunded: 50000,
+    refundableAmount: 100000,
   };
 
   const mockRefunds: RefundPresentation[] = [

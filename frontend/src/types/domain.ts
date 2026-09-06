@@ -30,6 +30,8 @@ export interface PaymentPresentation {
   metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+  totalRefunded?: number;
+  refundableAmount?: number;
 }
 
 export type RefundStatus = 'PENDING' | 'SUCCESS' | 'FAILED';

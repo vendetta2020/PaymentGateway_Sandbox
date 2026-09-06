@@ -13,8 +13,10 @@ import {
   Key,
   SlidersHorizontal,
   X,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 export interface NavItem {
   label: string;
@@ -40,6 +42,10 @@ export interface SidebarProps {
 
 export function Sidebar({ onCloseMobile, className }: SidebarProps) {
   const pathname = usePathname();
+  const { merchant, isAuthenticated, logout } = useAuth();
+
+  const merchantDisplayName = merchant?.businessName || merchant?.name || 'Simulator Merchant';
+  const merchantIdDisplay = merchant ? `merch_${merchant.id.slice(0, 8)}` : 'Not Authenticated';
 
   return (
     <aside
@@ -77,19 +83,30 @@ export function Sidebar({ onCloseMobile, className }: SidebarProps) {
 
       {/* Merchant Switcher / Context */}
       <div className="px-4 py-3 mx-3 my-3 bg-white border border-border rounded-sm flex items-center justify-between">
-        <div className="overflow-hidden">
-          <p className="text-xs font-semibold text-neutral-900 truncate">
-            PT Toko Elektronik Demo
+        <div className="overflow-hidden pr-2">
+          <p className="text-xs font-semibold text-neutral-900 truncate" title={merchantDisplayName}>
+            {merchantDisplayName}
           </p>
           <p className="text-[10px] font-mono text-neutral-500 truncate">
-            merch_8892
+            {merchantIdDisplay}
           </p>
         </div>
-        <span
-          className="w-2 h-2 rounded-full bg-neutral-900 shrink-0"
-          title="Active Merchant Context"
-          aria-hidden="true"
-        />
+        {isAuthenticated ? (
+          <button
+            onClick={logout}
+            title="Log out / Switch merchant"
+            aria-label="Log out"
+            className="p-1 text-neutral-400 hover:text-neutral-900 hover:bg-surface-subtle rounded-sm"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <span
+            className="w-2 h-2 rounded-full bg-neutral-400 shrink-0"
+            title="Not Authenticated"
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {/* Navigation Links */}

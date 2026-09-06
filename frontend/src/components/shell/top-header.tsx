@@ -3,6 +3,7 @@
 import React from 'react';
 import { Search, User, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 export interface TopHeaderProps {
   onOpenMobileSidebar?: () => void;
@@ -11,6 +12,7 @@ export interface TopHeaderProps {
 
 export function TopHeader({ onOpenMobileSidebar, className }: TopHeaderProps) {
   const envLabel = process.env.NEXT_PUBLIC_ENVIRONMENT || 'TEST';
+  const { merchant, isAuthenticated } = useAuth();
 
   return (
     <header
@@ -68,11 +70,11 @@ export function TopHeader({ onOpenMobileSidebar, className }: TopHeaderProps) {
         {/* User Account / Profile */}
         <div className="flex items-center gap-2 text-neutral-800">
           <span className="hidden md:inline-block font-mono text-xs text-neutral-600">
-            dev@tokoelektronik.id
+            {merchant?.email || (isAuthenticated ? 'merchant@gateway' : 'Unauthenticated')}
           </span>
           <div
             className="w-7 h-7 bg-black text-white rounded-full flex items-center justify-center font-bold text-xs"
-            aria-label="User profile dev@tokoelektronik.id"
+            aria-label={`User profile ${merchant?.email || ''}`}
           >
             <User className="w-4 h-4" />
           </div>

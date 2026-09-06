@@ -29,8 +29,14 @@ export async function apiClient<T>(
     ...(headers as Record<string, string>),
   };
 
-  if (apiKey) {
-    requestHeaders['Authorization'] = `Bearer ${apiKey}`;
+  const effectiveApiKey =
+    apiKey ||
+    (typeof window !== 'undefined'
+      ? sessionStorage.getItem('payment_gateway_api_key')
+      : null);
+
+  if (effectiveApiKey) {
+    requestHeaders['Authorization'] = `Bearer ${effectiveApiKey}`;
   }
 
   if (idempotencyKey) {

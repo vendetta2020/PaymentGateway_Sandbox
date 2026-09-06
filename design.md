@@ -8,7 +8,7 @@ This document serves as the **authoritative visual source of truth** for the Pay
 
 ## 1. Global Aesthetic (Functional Brutalism)
 The UI follows a Functional Web Brutalism approach. It avoids soft, generic SaaS aesthetics in favor of a technical, high-reliability financial infrastructure look.
-- **Zero/Minimal Border Radius**: UI elements (cards, buttons, inputs) must have `0px` or a maximum of `2px` border radius (`rounded-none` or `rounded-sm`).
+- **Restrained Border Radius**: Border radius should be used deliberately. Major structural surfaces (cards, large panels) should generally remain sharp (`rounded-none` or `rounded-sm`). Small controls (buttons, inputs, badges) may use a minimal preferred radius (`rounded-md`) when useful for ergonomics. Avoid excessive rounded UI (`rounded-2xl`, `rounded-full`) and pill-shaped components unless strictly necessary.
 - **No Drop Shadows**: Avoid diffuse drop shadows (`shadow-md`, `shadow-xl`). Surfaces are defined by 1px solid borders, not shadows.
 - **High Contrast Borders**: Use crisp 1px borders (`border-gray-200` or `border-gray-300`) to separate sections and table rows.
 
@@ -20,7 +20,7 @@ The UI follows a Functional Web Brutalism approach. It avoids soft, generic SaaS
 ## 3. Typography System
 Typography is used structurally to differentiate types of information:
 - **Primary Text (Sans-Serif)**: Use a clean, grotesque sans-serif (e.g., Inter, Roboto, or system sans) for standard UI text, headers, and navigation.
-- **Technical Identifiers (Serif)**: **CRITICAL DISTINCTION**. Transaction IDs (`pay_01...`), Order IDs, and technical reference strings must use a **Serif font** (e.g., Georgia, Times New Roman, or UI serif). This provides a distinct document/ledger feel.
+- **Technical Identifiers (Monospace)**: **CRITICAL DISTINCTION**. Transaction IDs (`pay_01...`), Order IDs, provider references, credential IDs, idempotency keys, and webhook IDs must use a **Monospace font** (e.g., `font-mono`). This ensures technical strings are highly readable and prevents character ambiguity (e.g., `O` vs `0`).
 - **Financial Amounts**: Large, bold sans-serif with tight tracking (`tracking-tight`). Must use tabular numerals (`tabular-nums`) to ensure vertical alignment in tables.
 - **Table Headers / Eyebrows**: Small, uppercase, bold, with wide letter spacing (`text-xs uppercase tracking-wider text-gray-500`).
 
@@ -32,9 +32,10 @@ Typography is used structurally to differentiate types of information:
   - Main buttons (e.g., "Create API key", "Resolve discrepancy"): Solid Black `#000000` with white text.
   - Secondary buttons: Light gray background or transparent with 1px border.
 - **Status Colors** (Background / Text & Dot):
-  - **Succeeded / Matched**: Light Indigo/Blue background with matching dark dot and text.
+  - **Succeeded / Matched**: Light Indigo/Blue (or Emerald/Green) background with matching dark dot and text.
+  - **Pending / Processing**: Light Amber/Yellow background with amber dot and text.
   - **Failed / Discrepancy / Timeout**: Light Red/Crimson background with red dot and text (e.g., `text-red-700`).
-  - **Pending / Refunded / Revoked**: Light Gray background with gray dot and text.
+  - **Refunded / Revoked**: Light Slate/Gray background with dark gray dot and text.
 
 ## 5. Components & Elements
 
@@ -77,3 +78,21 @@ Typography is used structurally to differentiate types of information:
   - Sidebar collapses into a hamburger menu.
   - Detail page splits (e.g., Specs vs Timeline) stack vertically.
   - Tables allow horizontal scrolling (`overflow-x-auto`).
+
+## 9. Iconography
+- **Functional, Restrained Usage**: Icons must only be used where they provide immediate cognitive value (e.g., navigation menus, status indicators, explicit actions).
+- **No Decorative Overload**: Do not place icons next to every text label. Avoid illustrative or cartoonish icons. Stick to a simple, consistent, professional icon set (e.g., Lucide or Heroicons).
+
+## 10. Accessibility (A11y)
+- **WCAG AA Contrast**: Ensure all text, including placeholders and disabled states, meets the 4.5:1 contrast ratio.
+- **Keyboard Navigation**: All interactive elements must be reachable via the `Tab` key.
+- **Visible Focus States**: Display a clear, visible focus ring (`focus-visible:ring` or `outline: 2px solid`) when navigating via keyboard.
+- **Accessible Names**: Use `aria-label` or visually hidden text for icon-only buttons to ensure screen readers can announce them.
+- **Status Not Communicated by Color Alone**: Status must never be indicated solely by color. Always include text labels or distinct icons (e.g., the text "Failed" alongside the red dot).
+- **Readable Table Structure**: Use semantic `<th>` and scope attributes (`scope="col"`, `scope="row"`).
+- **Explicit States**: Always provide explicit and accessible loading, empty, and error states.
+
+## 11. Backend Authority
+- **Strict Separation of Concerns**: The frontend must never become the source of truth for business logic.
+- **No Financial Calculations**: The frontend must not calculate financial values, payment lifecycle states, refund balances, settlement totals, reconciliation outcomes, or provider states.
+- **Display Only**: The frontend simply displays what the backend API provides. If a value needs to be computed, it must be computed in the backend and returned via the API.

@@ -27,9 +27,13 @@ describe('CreatePaymentModal', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Create New Mock Payment')).toBeInTheDocument();
     expect(screen.getByLabelText(/Amount/i)).toBeInTheDocument();
+
+    const options = screen.getAllByRole('option');
+    const values = options.map((opt) => (opt as HTMLOptionElement).value);
+    expect(values).toEqual(['QRIS', 'VIRTUAL_ACCOUNT', 'EWALLET', 'CARD']);
   });
 
-  it('submits payment with positive integer amount and idempotencyKey', async () => {
+  it('submits payment with positive integer amount and idempotencyKey without metadata', async () => {
     const handleSuccess = vi.fn();
     const handleClose = vi.fn();
 
@@ -61,6 +65,8 @@ describe('CreatePaymentModal', () => {
           idempotencyKey: expect.any(String),
         }),
       );
+      const callPayload = (api.post as any).mock.calls[0][1];
+      expect(callPayload).not.toHaveProperty('metadata');
       expect(handleSuccess).toHaveBeenCalled();
       expect(handleClose).toHaveBeenCalled();
     });

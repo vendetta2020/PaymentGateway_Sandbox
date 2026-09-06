@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api-client';
+import { PaymentMethodType } from '@/types/domain';
 import { X, Plus, CreditCard } from 'lucide-react';
 
 export interface CreatePaymentModalProps {
@@ -17,8 +18,7 @@ export function CreatePaymentModal({ isOpen, onClose, onSuccess }: CreatePayment
   const [orderId, setOrderId] = useState(`ORD-${Date.now().toString().slice(-6)}`);
   const [amount, setAmount] = useState('150000');
   const [currency, setCurrency] = useState('IDR');
-  const [paymentMethod, setPaymentMethod] = useState<'QRIS' | 'BANK_TRANSFER' | 'E_WALLET' | 'CREDIT_CARD'>('QRIS');
-  const [customerEmail, setCustomerEmail] = useState('buyer@example.com');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('QRIS');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,9 +45,6 @@ export function CreatePaymentModal({ isOpen, onClose, onSuccess }: CreatePayment
           amount: parsedAmount,
           currency,
           paymentMethod,
-          metadata: {
-            customerEmail,
-          },
         },
         { idempotencyKey },
       );
@@ -155,26 +152,14 @@ export function CreatePaymentModal({ isOpen, onClose, onSuccess }: CreatePayment
             </label>
             <Select
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as any)}
+              onChange={(e) => setPaymentMethod(e.target.value as PaymentMethodType)}
               disabled={isLoading}
               options={[
                 { value: 'QRIS', label: 'QRIS (Simulated Static QR)' },
-                { value: 'BANK_TRANSFER', label: 'Virtual Account (Bank Transfer)' },
-                { value: 'E_WALLET', label: 'E-Wallet (OVO / GoPay / DANA)' },
-                { value: 'CREDIT_CARD', label: 'Credit Card (Simulated 3DS)' },
+                { value: 'VIRTUAL_ACCOUNT', label: 'Virtual Account (Bank Transfer)' },
+                { value: 'EWALLET', label: 'E-Wallet (OVO / GoPay / DANA)' },
+                { value: 'CARD', label: 'Card (Simulated 3DS)' },
               ]}
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold uppercase tracking-wider text-neutral-700 mb-1">
-              Customer Email
-            </label>
-            <Input
-              type="email"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              disabled={isLoading}
             />
           </div>
 

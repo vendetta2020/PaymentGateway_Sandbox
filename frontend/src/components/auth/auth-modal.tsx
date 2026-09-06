@@ -19,7 +19,7 @@ export function AuthModal() {
     // Load existing active merchants to assist testing
     async function loadMerchants() {
       try {
-        const response = await api.get<{ data: MerchantProfile[] }>('/merchants?limit=10&page=1');
+        const response = await api.get<{ data: MerchantProfile[] }>('/merchants?limit=10&offset=0');
         if (response?.data?.length > 0) {
           setMerchants(response.data);
           setSelectedMerchantId(response.data[0].id);

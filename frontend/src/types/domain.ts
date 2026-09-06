@@ -13,10 +13,10 @@ export type PaymentStatus =
   | 'EXPIRED';
 
 export type PaymentMethodType =
-  | 'BANK_TRANSFER'
-  | 'E_WALLET'
-  | 'CREDIT_CARD'
-  | 'QRIS';
+  | 'QRIS'
+  | 'VIRTUAL_ACCOUNT'
+  | 'EWALLET'
+  | 'CARD';
 
 export interface PaymentPresentation {
   id: string;

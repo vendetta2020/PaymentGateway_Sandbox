@@ -16,7 +16,10 @@ import { CreateSettlementDto } from '../dto/create-settlement.dto';
 import { TransitionSettlementDto } from '../dto/transition-settlement.dto';
 import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Settlements')
+@ApiBearerAuth('API-Key')
 @Controller('settlements')
 @UseGuards(ApiAuthGuard)
 export class SettlementController {

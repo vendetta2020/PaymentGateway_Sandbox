@@ -13,6 +13,7 @@ import { MerchantService, PaginatedMerchantsResponse } from './merchant.service'
 import { CreateMerchantDto } from './dto/create-merchant.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { Merchant } from './entities/merchant.entity';
+import { ApiTags } from '@nestjs/swagger';
 
 /**
  * Controller exposing internal development endpoints for the Merchant domain.
@@ -20,6 +21,7 @@ import { Merchant } from './entities/merchant.entity';
  * NOTE: Authentication and API keys are intentionally omitted in this phase.
  * These endpoints serve domain verification and foundation testing.
  */
+@ApiTags('Merchants')
 @Controller('merchants')
 export class MerchantController {
   constructor(private readonly merchantService: MerchantService) {}

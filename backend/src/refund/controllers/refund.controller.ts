@@ -19,6 +19,8 @@ import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import * as crypto from 'crypto';
 
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+
 function generateHash(payload: any): string {
   const sortedPayload = Object.keys(payload)
     .sort()
@@ -29,6 +31,8 @@ function generateHash(payload: any): string {
   return crypto.createHash('sha256').update(JSON.stringify(sortedPayload)).digest('hex');
 }
 
+@ApiTags('Refunds')
+@ApiBearerAuth('API-Key')
 @Controller()
 @UseGuards(ApiAuthGuard)
 export class RefundController {

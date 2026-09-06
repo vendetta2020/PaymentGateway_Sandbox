@@ -1,114 +1,72 @@
-# Payment Gateway
+# Educational Payment Gateway
 
-> **Educational / Portfolio Project**
->
-> This is a technically serious payment gateway simulation built for learning and demonstration purposes.
-> It is NOT a real payment processor and is NOT PCI DSS compliant.
+An educational payment gateway project built with NestJS, PostgreSQL, and TypeORM. Inspired by real-world processors like Midtrans, Xendit, and Stripe.
 
-## Tech Stack (Phase 1)
+> **Disclaimer**: This is strictly an educational system. It is NOT a real payment processor, does NOT process real financial transactions, and does NOT claim PCI DSS compliance.
 
-- **Backend**: Node.js, TypeScript, NestJS
+## 🚀 Features
+
+- **Merchant Management**: Multi-merchant isolation and provisioning.
+- **API Authentication**: Secure API key generation (Live/Test modes) with prefix-based and hashed storage.
+- **Payment Lifecycle**: Robust state machine (`PENDING`, `PROCESSING`, `SUCCEEDED`, `FAILED`, `EXPIRED`).
+- **Simulated Providers**: Deterministic external provider simulator (Bank Transfer, E-Wallet, Card, QRIS).
+- **Idempotency**: Strict idempotency controls using `Idempotency-Key` headers to prevent double charges.
+- **Webhooks**: Merchant notification system with event delivery, retries, and HMAC payload signing.
+- **Refunds**: Full and partial refunds validation, pessimistic locking, and lifecycle tracking.
+- **Settlements**: Deterministic financial settlement calculation with cross-period debt resolution.
+- **Reconciliation**: Two-way reconciliation engine comparing internal records with simulated bank mutations.
+- **Dockerized**: Full production-ready Docker Compose environment.
+
+## 🛠 Tech Stack
+
+- **Framework**: NestJS (v10) / Node.js (v24)
 - **Database**: PostgreSQL 16
-- **Testing**: Jest, Supertest
-- **Infrastructure**: Docker, Docker Compose
+- **ORM**: TypeORM
+- **Testing**: Jest (Unit & E2E)
+- **Docs**: OpenAPI (Swagger)
+- **Infrastructure**: Docker & Docker Compose
 
-## Prerequisites
+## 📦 Local Development Setup
 
-- Node.js >= 20
-- Docker & Docker Compose
-- npm
+### 1. Prerequisites
+- Docker & Docker Compose installed.
+- Node.js v24 (optional, for local development outside Docker).
 
-## Getting Started
-
-### 1. Start infrastructure services
-
+### 2. Start Services
+To start the database and backend application:
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
+This will start:
+- PostgreSQL on port `5432`
+- NestJS API on port `3000`
 
-This starts PostgreSQL 16 with health checks and automatically creates development and test databases.
-
-### 2. Set up the backend
-
-```bash
-cd backend
-cp .env.example .env
-npm install
-```
-
-### 3. Run database migrations
-
-```bash
-npm run migration:run
-```
-
-### 4. Run the application
-
-```bash
-npm run start:dev
-```
-
-The API will be available at `http://localhost:3000/`.
-
-### 5. Verify health
-
+### 3. Verify Health
 ```bash
 curl http://localhost:3000/health
 ```
 
-Expected response:
-```json
-{
-  "status": "ok",
-  "info": {
-    "database": {
-      "status": "up"
-    }
-  },
-  "error": {},
-  "details": {
-    "database": {
-      "status": "up"
-    }
-  }
-}
-```
+### 4. API Documentation
+Access the interactive Swagger documentation at:
+http://localhost:3000/docs
 
-## Testing
+## 🧪 Testing
+
+The repository includes a comprehensive test suite (Unit & E2E) ensuring strict financial integrity and concurrency safety.
 
 ```bash
-# Unit tests
-npm test
-
-# E2E tests (requires PostgreSQL container running)
+cd backend
+npm install
+# Run unit tests
+npm run test
+# Run end-to-end tests (requires PostgreSQL)
 npm run test:e2e
-
-# Linting
-npm run lint
-
-# Production build
-npm run build
 ```
 
-## Project Structure
+## 🏗 Architecture & Design Decisions
 
-```
-PaymentGateway/
-├── backend/                  # NestJS Application
-│   ├── Dockerfile            # Multi-stage production build
-│   ├── src/
-│   │   ├── common/           # Shared filters and utilities
-│   │   ├── config/           # Joi environment validation
-│   │   ├── database/         # TypeORM module & CLI DataSource
-│   │   └── health/           # Health check endpoint & unit tests
-│   └── test/                 # E2E test suite
-├── docker/
-│   └── postgres/init/        # Database initialization scripts
-├── docker-compose.yml        # PostgreSQL development container
-├── .gitignore
-└── README.md
-```
-
-## License
-
-This project is for educational purposes.
+1. **Modular Monolith**: Domains (Merchants, Payments, Refunds, Settlements, Webhooks) are strictly separated into NestJS modules.
+2. **Financial Precision**: All monetary values are stored as integers (`BIGINT`) representing the smallest currency unit. Floating point math is strictly forbidden in calculations.
+3. **Database Transactions**: Domain operations employ explicit TypeORM query runners to guarantee ACID compliance.
+4. **Non-Mutation Invariant**: The reconciliation engine acts as an append-only auditor and never alters internal payment records.
+5. **Concurrency Control**: Unique constraints (`merchant_id`, `idempotency_key`) and pessimistic locking (`FOR UPDATE`) are heavily utilized to serialize simultaneous requests and prevent race conditions.

@@ -21,6 +21,7 @@ import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import * as crypto from 'crypto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 function generateHash(payload: any): string {
   const sortedPayload = Object.keys(payload)
@@ -32,6 +33,8 @@ function generateHash(payload: any): string {
   return crypto.createHash('sha256').update(JSON.stringify(sortedPayload)).digest('hex');
 }
 
+@ApiTags('Payments')
+@ApiBearerAuth('API-Key')
 @Controller('payments')
 @UseGuards(ApiAuthGuard)
 export class PaymentController {
@@ -40,6 +43,7 @@ export class PaymentController {
     private readonly idempotencyService: IdempotencyService,
   ) {}
 
+  @ApiOperation({ summary: 'Create a new payment (Idempotent)' })
   @Post()
   async createPayment(
     @Req() req: AuthenticatedRequest,

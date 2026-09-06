@@ -15,7 +15,10 @@ import { ReconciliationService } from '../services/reconciliation.service';
 import { CreateReconciliationDto } from '../dto/create-reconciliation.dto';
 import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Reconciliations')
+@ApiBearerAuth('API-Key')
 @Controller('reconciliations')
 @UseGuards(ApiAuthGuard)
 export class ReconciliationController {

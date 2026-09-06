@@ -39,7 +39,7 @@ describe('PaymentDetailPage', () => {
     (useAuth as any).mockReturnValue({ isAuthenticated: true });
     (api.get as any).mockReturnValue(new Promise(() => {}));
     
-    render(<PaymentDetailPage params={mockParams} />);
+    render(<PaymentDetailPage />);
     
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
@@ -67,7 +67,7 @@ describe('PaymentDetailPage', () => {
       return Promise.resolve({ status: 'success', data: mockPayment });
     });
 
-    render(<PaymentDetailPage params={mockParams} />);
+    render(<PaymentDetailPage />);
 
     await waitFor(() => {
       expect(screen.getByText('pay_123')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('PaymentDetailPage', () => {
     
     (api.get as any).mockRejectedValue(new Error('Failed to fetch'));
 
-    render(<PaymentDetailPage params={mockParams} />);
+    render(<PaymentDetailPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/Failed to fetch/i)).toBeInTheDocument();

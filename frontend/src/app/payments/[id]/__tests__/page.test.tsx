@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PaymentDetailPage from '../page';
 import { api } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 vi.mock('@/lib/api-client', () => ({
   api: {
     get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -29,8 +30,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('PaymentDetailPage', () => {
-  const mockParams = Promise.resolve({ id: 'pay_123' });
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -74,8 +73,90 @@ describe('PaymentDetailPage', () => {
     });
     
     expect(screen.getByText('ORD-001')).toBeInTheDocument();
-    expect(screen.getByText('Rp 150.000')).toBeInTheDocument();
+    expect(screen.getAllByText('Rp 150.000').length).toBeGreaterThan(0);
     expect(screen.getAllByText('QRIS').length).toBeGreaterThan(0);
+  });
+
+  it('renders refund history records when present', async () => {
+    (useAuth as any).mockReturnValue({ isAuthenticated: true });
+
+    const mockPayment = {
+      id: 'pay_123',
+      orderId: 'ORD-001',
+      amount: 150000,
+      currency: 'IDR',
+      status: 'SUCCEEDED',
+      paymentMethod: 'QRIS',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      totalRefunded: 50000,
+      refundableAmount: 100000,
+    };
+
+    const mockRefunds = [
+      {
+        id: 'ref_001_abc',
+        paymentId: 'pay_123',
+        amount: 50000,
+        reason: 'Customer return goods',
+        status: 'SUCCESS',
+        providerReference: 'sim_ref_001',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    (api.get as any).mockImplementation((url: string) => {
+      if (url.endsWith('/refunds')) {
+        return Promise.resolve({ status: 'success', data: mockRefunds });
+      }
+      return Promise.resolve({ status: 'success', data: mockPayment });
+    });
+
+    render(<PaymentDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Customer return goods/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/previously returned across 1 refund request/i)).toBeInTheDocument();
+      expect(screen.getByText(/refundable remaining/i)).toBeInTheDocument();
+    });
+  });
+
+  it('opens refund modal when clicking refund button', async () => {
+    (useAuth as any).mockReturnValue({ isAuthenticated: true });
+
+    const mockPayment = {
+      id: 'pay_123',
+      orderId: 'ORD-001',
+      amount: 150000,
+      currency: 'IDR',
+      status: 'SUCCEEDED',
+      paymentMethod: 'QRIS',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      totalRefunded: 0,
+      refundableAmount: 150000,
+    };
+
+    (api.get as any).mockImplementation((url: string) => {
+      if (url.endsWith('/refunds')) {
+        return Promise.resolve({ status: 'success', data: [] });
+      }
+      return Promise.resolve({ status: 'success', data: mockPayment });
+    });
+
+    render(<PaymentDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('pay_123')).toBeInTheDocument();
+    });
+
+    const refundButton = screen.getByRole('button', { name: /issue refund/i });
+    fireEvent.click(refundButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /issue refund/i })).toBeInTheDocument();
+    });
   });
 
   it('renders error state on API failure', async () => {

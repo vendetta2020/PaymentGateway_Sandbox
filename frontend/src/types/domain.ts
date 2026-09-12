@@ -40,6 +40,7 @@ export interface RefundPresentation {
   id: string;
   paymentId: string;
   amount: number;
+  currency?: string;
   reason: string;
   status: RefundStatus;
   providerReference: string | null;

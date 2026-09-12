@@ -396,10 +396,11 @@ export default function PaymentDetailPage() {
                     {refunds.length} refund request(s)
                   </p>
                 </div>
-                <div className="text-right font-mono font-bold text-xs text-neutral-700">
-                  {payment.amount > 0
-                    ? `${((totalRefunded / payment.amount) * 100).toFixed(1)}% REFUNDED`
-                    : '0% REFUNDED'}
+                <div className="text-right font-mono text-xs">
+                  <span className="text-neutral-500 uppercase text-[10px] block">Original Amount</span>
+                  <span className="font-bold text-neutral-900">
+                    {formatCurrency(payment.amount, payment.currency)}
+                  </span>
                 </div>
               </div>
 
@@ -430,7 +431,20 @@ export default function PaymentDetailPage() {
                           </p>
                         </div>
                         <div className="text-right text-[11px] font-mono text-neutral-500">
-                          <div>Ref: {r.id.slice(0, 16)}...</div>
+                          <div className="flex items-center justify-end gap-1">
+                            <span title={r.id}>ID: {r.id.slice(0, 14)}...</span>
+                            <button
+                              onClick={() => handleCopy(r.id, `ref_${r.id}`)}
+                              title="Copy Refund UUID"
+                              className="text-neutral-400 hover:text-black p-0.5 rounded"
+                            >
+                              {copiedKey === `ref_${r.id}` ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
                           <div>{formatDateTime(r.createdAt)}</div>
                         </div>
                       </div>

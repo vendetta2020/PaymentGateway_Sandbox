@@ -120,4 +120,66 @@ describe('AuthModule (e2e)', () => {
       await request(app.getHttpServer()).get('/api/v1/auth/me').expect(401);
     });
   });
+
+  describe('Authenticated API Credentials Management', () => {
+    let newCredentialId: string;
+    let newPlaintextSecret: string;
+
+    it('POST /api/v1/api-credentials should provision a credential for authenticated merchant', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/api-credentials')
+        .set('Authorization', `Bearer ${plaintextSecret}`)
+        .expect(201);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.data.credentialId).toBeDefined();
+      expect(response.body.data.publicKey).toBeDefined();
+      expect(response.body.data.secretKey).toMatch(/^sk_test_/);
+
+      newCredentialId = response.body.data.credentialId;
+      newPlaintextSecret = response.body.data.secretKey;
+    });
+
+    it('GET /api/v1/api-credentials should list credentials strictly omitting secretHash', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/api-credentials')
+        .set('Authorization', `Bearer ${plaintextSecret}`)
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(2);
+
+      const found = response.body.data.find((c: any) => c.id === newCredentialId);
+      expect(found).toBeDefined();
+      expect(found.status).toBe('ACTIVE');
+      expect(found.publicKey).toBeDefined();
+      expect(found.secretHash).toBeUndefined();
+    });
+
+    it('DELETE /api/v1/api-credentials/:id should revoke the credential', async () => {
+      const response = await request(app.getHttpServer())
+        .delete(`/api/v1/api-credentials/${newCredentialId}`)
+        .set('Authorization', `Bearer ${plaintextSecret}`)
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.data.status).toBe('REVOKED');
+      expect(response.body.data.secretHash).toBeUndefined();
+
+      // Verify that revoked credential can no longer be used for authentication
+      await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${newPlaintextSecret}`)
+        .expect(401);
+    });
+
+    it('DELETE /api/v1/api-credentials/:id should return 404 for non-existent or unowned credential', async () => {
+      const randomUuid = '00000000-0000-4000-a000-000000000000';
+      await request(app.getHttpServer())
+        .delete(`/api/v1/api-credentials/${randomUuid}`)
+        .set('Authorization', `Bearer ${plaintextSecret}`)
+        .expect(404);
+    });
+  });
 });

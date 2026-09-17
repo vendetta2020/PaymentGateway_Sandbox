@@ -114,6 +114,67 @@ describe('ReconciliationModule (e2e)', () => {
     return procRes.body.data;
   }
 
+  describe('Period Validation (AUDIT-P16-002)', () => {
+    it('should reject periods longer than 31 days', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/reconciliations')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({
+          periodStart: '2026-01-01T00:00:00Z',
+          periodEnd: '2026-02-01T00:00:01Z', // 31 days + 1 second
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain('cannot exceed 31 days');
+        });
+    });
+
+    it('should reject periodStart >= periodEnd', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/reconciliations')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({
+          periodStart: '2026-02-01T00:00:00Z',
+          periodEnd: '2026-01-01T00:00:00Z',
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain('strictly greater than periodStart');
+        });
+
+      await request(app.getHttpServer())
+        .post('/api/v1/reconciliations')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({
+          periodStart: '2026-01-01T00:00:00Z',
+          periodEnd: '2026-01-01T00:00:00Z',
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain('strictly greater than periodStart');
+        });
+    });
+
+    it('should reject missing or malformed dates', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/reconciliations')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({
+          periodEnd: '2026-01-01T00:00:00Z',
+        })
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/reconciliations')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({
+          periodStart: '2026-01-01',
+          periodEnd: 'invalid',
+        })
+        .expect(400);
+    });
+  });
+
   describe('Reconciliation Discrepancy Scenarios', () => {
     it('Scenario 1: PERFECT_MATCH - all internal payments match provider records', async () => {
       const p1 = await createSucceededPayment(100000);

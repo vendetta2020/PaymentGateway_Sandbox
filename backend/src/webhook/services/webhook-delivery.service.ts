@@ -4,7 +4,12 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { WebhookDelivery } from '../entities/webhook-delivery.entity';
 import { WebhookDeliveryStatus } from '../enums/webhook-delivery-status.enum';
+import { MerchantWebhookConfig } from '../entities/webhook-config.entity';
+import { WebhookEvent } from '../entities/webhook-event.entity';
 import * as crypto from 'crypto';
+import * as dns from 'dns/promises';
+import * as http from 'http';
+import * as https from 'https';
 
 export function computeWebhookSignature(
   secret: string,
@@ -56,11 +61,43 @@ export class WebhookDeliveryService {
     private readonly configService: ConfigService,
   ) {}
 
+  private isPrivateOrLocalIp(ip: string): boolean {
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.substring(7);
+    }
+
+    if (ip.includes('.')) {
+      if (ip.startsWith('127.')) return true;
+      if (ip.startsWith('10.')) return true;
+      if (ip.startsWith('192.168.')) return true;
+      if (ip.startsWith('169.254.')) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+      if (ip === '0.0.0.0') return true;
+      return false;
+    }
+
+    const ipLower = ip.toLowerCase();
+    if (ipLower === '::1') return true;
+    if (ipLower.startsWith('fc') || ipLower.startsWith('fd')) return true;
+    if (
+      ipLower.startsWith('fe8') ||
+      ipLower.startsWith('fe9') ||
+      ipLower.startsWith('fea') ||
+      ipLower.startsWith('feb')
+    )
+      return true;
+
+    return false;
+  }
+
   /**
    * SSRF Protection: Validates protocol and rejects private/internal IPs
    * unless ALLOW_DEV_LOCAL_WEBHOOKS is explicitly enabled in dev/test.
+   * Returns the resolved IP address to ensure TOCTOU safety by pinning it.
    */
-  validateUrlSecurity(urlString: string): { isValid: boolean; reason?: string } {
+  async validateUrlSecurity(
+    urlString: string,
+  ): Promise<{ isValid: boolean; reason?: string; pinnedIp?: string }> {
     try {
       const parsed = new URL(urlString);
 
@@ -71,35 +108,38 @@ export class WebhookDeliveryService {
       const allowLocal = Boolean(this.configService.get<boolean>('ALLOW_DEV_LOCAL_WEBHOOKS'));
       const hostname = parsed.hostname.toLowerCase();
 
-      // Check if hostname is an internal/localhost destination
-      const isLocalhost =
-        hostname === 'localhost' ||
-        hostname === '127.0.0.1' ||
-        hostname === '::1' ||
-        hostname.endsWith('.localhost');
-
-      const isPrivateIp =
-        hostname.startsWith('10.') ||
-        hostname.startsWith('192.168.') ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
-
       const isCloudMetadata =
         hostname === '169.254.169.254' ||
         hostname === 'metadata.google.internal' ||
         hostname.endsWith('.internal');
 
-      if (!allowLocal && (isLocalhost || isPrivateIp || isCloudMetadata)) {
-        return {
-          isValid: false,
-          reason: `SSRF Blocked: Private/internal destination '${hostname}' is not permitted in production.`,
-        };
-      }
-
       if (isCloudMetadata) {
         return { isValid: false, reason: 'SSRF Blocked: Cloud metadata access prohibited.' };
       }
 
-      return { isValid: true };
+      let addresses: { address: string; family: number }[];
+      try {
+        addresses = await dns.lookup(hostname, { all: true });
+      } catch {
+        return { isValid: false, reason: 'DNS resolution failed.' };
+      }
+
+      if (!allowLocal) {
+        for (const { address } of addresses) {
+          if (this.isPrivateOrLocalIp(address)) {
+            return {
+              isValid: false,
+              reason: `SSRF Blocked: Private/internal destination '${hostname}' is not permitted in production.`,
+            };
+          }
+        }
+      }
+
+      if (!addresses || addresses.length === 0) {
+        return { isValid: false, reason: 'DNS resolution returned no addresses.' };
+      }
+
+      return { isValid: true, pinnedIp: addresses[0].address };
     } catch {
       return { isValid: false, reason: 'Malformed URL.' };
     }
@@ -114,55 +154,125 @@ export class WebhookDeliveryService {
   }
 
   /**
+   * Dispatches the webhook HTTP request using a pinned IP address
+   * to strictly prevent TOCTOU DNS rebinding SSRF attacks.
+   */
+  private async dispatchWebhook(
+    endpointUrl: string,
+    pinnedIp: string,
+    headers: Record<string, string>,
+    body: string,
+    timeoutMs: number,
+  ): Promise<{ status: number; ok: boolean }> {
+    const url = new URL(endpointUrl);
+    const isHttps = url.protocol === 'https:';
+
+    const options: http.RequestOptions | https.RequestOptions = {
+      method: 'POST',
+      hostname: pinnedIp, // Pinned destination IP
+      port: url.port ? parseInt(url.port, 10) : isHttps ? 443 : 80,
+      path: url.pathname + url.search,
+      headers: {
+        ...headers,
+        Host: url.hostname, // Preserve original hostname for SNI/Host headers
+      },
+      timeout: timeoutMs,
+    };
+
+    if (isHttps) {
+      (options as https.RequestOptions).servername = url.hostname; // Crucial for TLS SNI and cert validation
+    }
+
+    const reqModule = isHttps ? https : http;
+
+    return new Promise((resolve, reject) => {
+      const req = reqModule.request(options, (res) => {
+        // Redirection limit (none allowed) must be handled by the caller,
+        // but since we only resolve the response, caller handles 3xx as failure.
+        resolve({
+          status: res.statusCode || 500,
+          ok: (res.statusCode || 500) >= 200 && (res.statusCode || 500) < 300,
+        });
+      });
+
+      req.on('error', (err: Error) => reject(err));
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request Timeout'));
+      });
+
+      req.write(body);
+      req.end();
+    });
+  }
+
+  /**
    * Delivers a single webhook delivery attempt.
    */
   async deliver(deliveryId: string): Promise<WebhookDelivery> {
-    let delivery = await this.deliveryRepository.findOne({
-      where: { id: deliveryId },
-      relations: { webhookEvent: true, webhookConfig: true },
-    });
+    const queryRunner = this.deliveryRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // If delivery was just created in an active transaction, wait briefly for commit
-    let attempts = 0;
-    while (!delivery && attempts < 20) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      delivery = await this.deliveryRepository.findOne({
+    let delivery: WebhookDelivery | null = null;
+    let webhookEvent: WebhookEvent | undefined;
+    let webhookConfig: MerchantWebhookConfig | undefined;
+
+    try {
+      delivery = await queryRunner.manager.findOne(WebhookDelivery, {
+        where: { id: deliveryId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!delivery) {
+        throw new Error(`Webhook delivery record ${deliveryId} not found`);
+      }
+
+      if (
+        delivery.status !== WebhookDeliveryStatus.PENDING &&
+        delivery.status !== WebhookDeliveryStatus.FAILED
+      ) {
+        await queryRunner.rollbackTransaction();
+        return delivery;
+      }
+
+      const deliveryWithRelations = await queryRunner.manager.findOne(WebhookDelivery, {
         where: { id: deliveryId },
         relations: { webhookEvent: true, webhookConfig: true },
       });
-      attempts++;
-    }
 
-    if (!delivery) {
-      throw new Error(`Webhook delivery record ${deliveryId} not found`);
-    }
+      webhookEvent = deliveryWithRelations?.webhookEvent;
+      webhookConfig = deliveryWithRelations?.webhookConfig;
 
-    if (delivery.status === WebhookDeliveryStatus.DELIVERED) {
-      return delivery;
-    }
+      if (!webhookEvent || !webhookConfig) {
+        throw new Error(`Delivery ${deliveryId} is missing associated event or config`);
+      }
 
-    const { webhookEvent, webhookConfig } = delivery;
+      delivery.status = WebhookDeliveryStatus.DELIVERING;
+      const attemptNumber = delivery.attemptCount + 1;
+      delivery.attemptCount = attemptNumber;
+      delivery.lastAttemptAt = new Date();
 
-    if (!webhookEvent || !webhookConfig) {
-      throw new Error(`Delivery ${deliveryId} is missing associated event or config`);
+      await queryRunner.manager.save(WebhookDelivery, delivery);
+      await queryRunner.commitTransaction();
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
 
     this.logger.log(`Initiating webhook delivery attempt for delivery ID ${deliveryId}`);
 
     // SSRF Check
-    const ssrfCheck = this.validateUrlSecurity(webhookConfig.endpointUrl);
-    if (!ssrfCheck.isValid) {
+    const ssrfCheck = await this.validateUrlSecurity(webhookConfig.endpointUrl);
+    if (!ssrfCheck.isValid || !ssrfCheck.pinnedIp) {
       delivery.status = WebhookDeliveryStatus.EXHAUSTED;
-      delivery.lastError = ssrfCheck.reason;
-      delivery.lastAttemptAt = new Date();
-      delivery.attemptCount += 1;
+      delivery.lastError = ssrfCheck.reason || 'SSRF blocked';
       return this.deliveryRepository.save(delivery);
     }
 
-    delivery.status = WebhookDeliveryStatus.DELIVERING;
-    await this.deliveryRepository.save(delivery);
-
-    // Prepare Signed Request
     const rawPayload = JSON.stringify(webhookEvent.payload);
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = computeWebhookSignature(webhookConfig.signingSecret, timestamp, rawPayload);
@@ -175,22 +285,25 @@ export class WebhookDeliveryService {
       'User-Agent': 'PaymentGateway-Webhook/1.0',
     };
 
-    const attemptNumber = delivery.attemptCount + 1;
-    delivery.attemptCount = attemptNumber;
-    delivery.lastAttemptAt = new Date();
-
     try {
-      // 5-second request timeout via AbortSignal
-      const response = await fetch(webhookConfig.endpointUrl, {
-        method: 'POST',
+      // 5-second request timeout, passing pinned IP
+      const response = await this.dispatchWebhook(
+        webhookConfig.endpointUrl,
+        ssrfCheck.pinnedIp,
         headers,
-        body: rawPayload,
-        signal: AbortSignal.timeout(5000),
-      });
+        rawPayload,
+        5000,
+      );
 
       delivery.lastHttpStatus = response.status;
 
-      if (response.ok) {
+      if (response.status >= 300 && response.status < 400) {
+        this.handleRetryableFailure(
+          delivery,
+          delivery.attemptCount,
+          `Merchant returned unexpected redirect HTTP ${response.status}`,
+        );
+      } else if (response.ok) {
         // HTTP 2xx -> Success
         delivery.status = WebhookDeliveryStatus.DELIVERED;
         delivery.deliveredAt = new Date();
@@ -205,14 +318,14 @@ export class WebhookDeliveryService {
         // HTTP 5xx -> Retryable server error
         this.handleRetryableFailure(
           delivery,
-          attemptNumber,
+          delivery.attemptCount,
           `Merchant returned HTTP ${response.status}`,
         );
       }
     } catch (err: any) {
       const errorMsg = (err.message || 'Unknown network error').substring(0, 500);
       delivery.lastHttpStatus = null;
-      this.handleRetryableFailure(delivery, attemptNumber, errorMsg);
+      this.handleRetryableFailure(delivery, delivery.attemptCount, errorMsg);
     }
 
     return this.deliveryRepository.save(delivery);
@@ -233,5 +346,23 @@ export class WebhookDeliveryService {
       const delay = this.getBackoffDelayMs(attemptNumber);
       delivery.nextAttemptAt = new Date(Date.now() + delay);
     }
+  }
+
+  /**
+   * Lists recent webhook deliveries for a specific merchant, including event and config metadata.
+   */
+  async listDeliveriesForMerchant(
+    merchantId: string,
+    limit: number = 50,
+  ): Promise<WebhookDelivery[]> {
+    return this.deliveryRepository
+      .createQueryBuilder('delivery')
+      .innerJoinAndSelect('delivery.webhookEvent', 'webhookEvent')
+      .leftJoin('delivery.webhookConfig', 'webhookConfig')
+      .addSelect(['webhookConfig.id', 'webhookConfig.endpointUrl', 'webhookConfig.status'])
+      .where('webhookEvent.merchantId = :merchantId', { merchantId })
+      .orderBy('delivery.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
   }
 }

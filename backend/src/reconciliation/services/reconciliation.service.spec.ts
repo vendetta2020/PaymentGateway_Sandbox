@@ -81,7 +81,38 @@ describe('ReconciliationService', () => {
           periodStart: '2026-09-06T10:00:00Z',
           periodEnd: '2026-09-06T08:00:00Z',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow('periodEnd must be strictly greater than periodStart');
+
+      await expect(
+        service.runReconciliation(merchantId, {
+          periodStart: '2026-09-06T10:00:00Z',
+          periodEnd: '2026-09-06T10:00:00Z',
+        }),
+      ).rejects.toThrow('periodEnd must be strictly greater than periodStart');
+    });
+
+    it('should reject periods longer than 31 days (AUDIT-P16-002)', async () => {
+      // Exactly 31 days should pass validation (but fail downstream if we don't mock, so we just mock the rest)
+      runRepo.findOne.mockResolvedValue(null);
+      runRepo.create.mockReturnValue({} as any);
+      runRepo.save.mockResolvedValue({} as any);
+      paymentRepo.find.mockResolvedValue([]);
+      paymentProvider.getTransactions.mockResolvedValue([]);
+
+      await expect(
+        service.runReconciliation(merchantId, {
+          periodStart: '2026-01-01T00:00:00Z',
+          periodEnd: '2026-02-01T00:00:00Z', // 31 days
+        }),
+      ).resolves.toBeDefined();
+
+      // 31 days and 1 second should fail
+      await expect(
+        service.runReconciliation(merchantId, {
+          periodStart: '2026-01-01T00:00:00Z',
+          periodEnd: '2026-02-01T00:00:01Z', // 31 days + 1 second
+        }),
+      ).rejects.toThrow('Reconciliation period cannot exceed 31 days');
     });
 
     it('should produce MATCHED results when internal and provider records match perfectly', async () => {

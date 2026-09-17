@@ -23,6 +23,9 @@ describe('StatusBadge', () => {
       { status: 'REFUNDED', label: 'Refunded' },
       { status: 'REVOKED', label: 'Revoked' },
       { status: 'EXPIRED', label: 'Expired' },
+      { status: 'SETTLED', label: 'Settled' },
+      { status: 'COMPLETED', label: 'Completed' },
+      { status: 'RUNNING', label: 'Running' },
     ] as const;
 
     for (const item of statuses) {

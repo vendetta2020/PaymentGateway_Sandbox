@@ -10,7 +10,15 @@ export type StatusType =
   | 'REVOKED'
   | 'MATCHED'
   | 'DISCREPANCY'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'ACTIVE'
+  | 'DELIVERED'
+  | 'DELIVERING'
+  | 'EXHAUSTED'
+  | 'DISABLED'
+  | 'SETTLED'
+  | 'COMPLETED'
+  | 'RUNNING';
 
 export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   status: StatusType | string;
@@ -34,6 +42,20 @@ const statusConfigs: Record<string, StatusConfig> = {
     borderClass: 'border-[#C7D2FE]',
     dotClass: 'bg-[#4F46E5]',
   },
+  ACTIVE: {
+    label: 'Active',
+    bgClass: 'bg-[#ECFDF5]',
+    textClass: 'text-[#065F46]',
+    borderClass: 'border-[#A7F3D0]',
+    dotClass: 'bg-[#10B981]',
+  },
+  DELIVERED: {
+    label: 'Delivered',
+    bgClass: 'bg-[#ECFDF5]',
+    textClass: 'text-[#065F46]',
+    borderClass: 'border-[#A7F3D0]',
+    dotClass: 'bg-[#10B981]',
+  },
   MATCHED: {
     label: 'Matched',
     bgClass: 'bg-[#ECFDF5]',
@@ -41,12 +63,40 @@ const statusConfigs: Record<string, StatusConfig> = {
     borderClass: 'border-[#A7F3D0]',
     dotClass: 'bg-[#10B981]',
   },
+  SETTLED: {
+    label: 'Settled',
+    bgClass: 'bg-[#EEF2FF]',
+    textClass: 'text-[#3730A3]',
+    borderClass: 'border-[#C7D2FE]',
+    dotClass: 'bg-[#4F46E5]',
+  },
+  COMPLETED: {
+    label: 'Completed',
+    bgClass: 'bg-[#ECFDF5]',
+    textClass: 'text-[#065F46]',
+    borderClass: 'border-[#A7F3D0]',
+    dotClass: 'bg-[#10B981]',
+  },
+  RUNNING: {
+    label: 'Running',
+    bgClass: 'bg-[#FEF3C7]',
+    textClass: 'text-[#78350F]',
+    borderClass: 'border-[#FCD34D]',
+    dotClass: 'bg-[#D97706]',
+  },
   PENDING: {
     label: 'Pending',
     bgClass: 'bg-[#FFFBEB]',
     textClass: 'text-[#92400E]',
     borderClass: 'border-[#FDE68A]',
     dotClass: 'bg-[#F59E0B]',
+  },
+  DELIVERING: {
+    label: 'Delivering',
+    bgClass: 'bg-[#FEF3C7]',
+    textClass: 'text-[#78350F]',
+    borderClass: 'border-[#FCD34D]',
+    dotClass: 'bg-[#D97706]',
   },
   PROCESSING: {
     label: 'Processing',
@@ -61,6 +111,13 @@ const statusConfigs: Record<string, StatusConfig> = {
     textClass: 'text-[#991B1B]',
     borderClass: 'border-[#FECACA]',
     dotClass: 'bg-[#DC2626]',
+  },
+  EXHAUSTED: {
+    label: 'Exhausted',
+    bgClass: 'bg-[#FFF1F2]',
+    textClass: 'text-[#9F1239]',
+    borderClass: 'border-[#FECDD3]',
+    dotClass: 'bg-[#E11D48]',
   },
   DISCREPANCY: {
     label: 'Discrepancy',
@@ -83,6 +140,13 @@ const statusConfigs: Record<string, StatusConfig> = {
     borderClass: 'border-[#E5E7EB]',
     dotClass: 'bg-[#9CA3AF]',
   },
+  DISABLED: {
+    label: 'Disabled',
+    bgClass: 'bg-[#F3F4F6]',
+    textClass: 'text-[#4B5563]',
+    borderClass: 'border-[#E5E7EB]',
+    dotClass: 'bg-[#9CA3AF]',
+  },
   EXPIRED: {
     label: 'Expired',
     bgClass: 'bg-[#F3F4F6]',
@@ -91,6 +155,7 @@ const statusConfigs: Record<string, StatusConfig> = {
     dotClass: 'bg-[#9CA3AF]',
   },
 };
+
 
 const defaultConfig: StatusConfig = {
   label: 'Unknown',

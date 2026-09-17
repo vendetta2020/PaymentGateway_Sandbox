@@ -16,6 +16,7 @@ describe('ApiCredentialService', () => {
       create: jest.fn(),
       save: jest.fn(),
       findOne: jest.fn(),
+      find: jest.fn(),
     };
 
     const merchantRepoMock = {
@@ -96,6 +97,67 @@ describe('ApiCredentialService', () => {
         plaintextSecret.substring(0, plaintextSecret.length - 1) + replacementChar;
       const isValid = service.verifySecret(tamperedSecret, (savedDto as ApiCredential).secretHash);
       expect(isValid).toBe(false);
+    });
+  });
+
+  describe('listCredentials', () => {
+    it('should query and return merchant credentials with safe fields', async () => {
+      const mockList = [
+        {
+          id: 'cred-1',
+          merchantId: 'merchant-1',
+          publicKey: 'pk_abc',
+          status: 'ACTIVE',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+      apiCredentialRepository.find.mockResolvedValueOnce(mockList as any);
+
+      const result = await service.listCredentials('merchant-1');
+
+      expect(apiCredentialRepository.find).toHaveBeenCalledWith({
+        where: { merchantId: 'merchant-1' },
+        order: { createdAt: 'DESC' },
+        select: {
+          id: true,
+          merchantId: true,
+          publicKey: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      expect(result).toEqual(mockList);
+    });
+  });
+
+  describe('revokeCredential', () => {
+    it('should throw NotFoundException if credential does not exist or does not belong to merchant', async () => {
+      apiCredentialRepository.findOne.mockResolvedValueOnce(null);
+      await expect(service.revokeCredential('m-1', 'c-99')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should set status to REVOKED and return safe credential omitting secretHash', async () => {
+      const mockCred = {
+        id: 'c-1',
+        merchantId: 'm-1',
+        publicKey: 'pub-key',
+        secretHash: 'verysecretshahashexample',
+        status: 'ACTIVE',
+      };
+      apiCredentialRepository.findOne.mockResolvedValueOnce(mockCred as any);
+      apiCredentialRepository.save.mockResolvedValueOnce({
+        ...mockCred,
+        status: 'REVOKED',
+      } as any);
+
+      const result = await service.revokeCredential('m-1', 'c-1');
+
+      expect(result.status).toBe('REVOKED');
+      expect((result as any).secretHash).toBeUndefined();
+      expect(apiCredentialRepository.save).toHaveBeenCalled();
     });
   });
 });

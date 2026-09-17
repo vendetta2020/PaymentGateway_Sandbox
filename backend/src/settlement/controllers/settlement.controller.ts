@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { SettlementService } from '../services/settlement.service';
 import { CreateSettlementDto } from '../dto/create-settlement.dto';
-import { TransitionSettlementDto } from '../dto/transition-settlement.dto';
 import { ApiAuthGuard } from '../../auth/guards/api-auth.guard';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -71,21 +70,6 @@ export class SettlementController {
         limit,
         offset,
       },
-    };
-  }
-
-  @Post(':id/transition')
-  async transitionSettlement(
-    @Req() req: AuthenticatedRequest,
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Body() dto: TransitionSettlementDto,
-  ) {
-    const merchantId = req.merchant.merchantId;
-    const settlement = await this.settlementService.transitionStatus(merchantId, id, dto.status);
-
-    return {
-      status: 'success',
-      data: settlement,
     };
   }
 }

@@ -43,8 +43,14 @@ export class ReconciliationService {
       throw new BadRequestException('Invalid date format for periodStart or periodEnd');
     }
 
-    if (periodEndDate.getTime() < periodStartDate.getTime()) {
-      throw new BadRequestException('periodEnd must be greater than or equal to periodStart');
+    if (periodEndDate.getTime() <= periodStartDate.getTime()) {
+      throw new BadRequestException('periodEnd must be strictly greater than periodStart');
+    }
+
+    const durationDays =
+      (periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (durationDays > 31) {
+      throw new BadRequestException('Reconciliation period cannot exceed 31 days');
     }
 
     // 1. Idempotency check: return existing completed run if already generated
@@ -136,14 +142,22 @@ export class ReconciliationService {
       throw error;
     }
 
-    // 5. Detect duplicate provider references in provider records
+    // 5. Detect duplicate provider references in provider records and build fast lookup
     const providerRefCounts = new Map<string, number>();
-    for (const rec of providerRecords) {
+    const providerIndicesByRef = new Map<string, number[]>();
+    for (let i = 0; i < providerRecords.length; i++) {
+      const rec = providerRecords[i];
       if (rec.providerReference) {
         providerRefCounts.set(
           rec.providerReference,
           (providerRefCounts.get(rec.providerReference) || 0) + 1,
         );
+        let indices = providerIndicesByRef.get(rec.providerReference);
+        if (!indices) {
+          indices = [];
+          providerIndicesByRef.set(rec.providerReference, indices);
+        }
+        indices.push(i);
       }
     }
 
@@ -161,9 +175,13 @@ export class ReconciliationService {
       totalInternalAmount += pAmount;
       const ref = p.providerReference;
 
-      const providerIdx = providerRecords.findIndex(
-        (r, idx) => !matchedProviderIndices.has(idx) && r.providerReference === ref,
-      );
+      let providerIdx = -1;
+      if (ref) {
+        const availableIndices = providerIndicesByRef.get(ref);
+        if (availableIndices && availableIndices.length > 0) {
+          providerIdx = availableIndices.shift()!;
+        }
+      }
 
       if (providerIdx === -1) {
         // Missing in provider

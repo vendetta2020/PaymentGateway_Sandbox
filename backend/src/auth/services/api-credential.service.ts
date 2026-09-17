@@ -87,6 +87,47 @@ export class ApiCredentialService {
   }
 
   /**
+   * Lists all credentials for a merchant, strictly omitting secret hashes.
+   */
+  async listCredentials(merchantId: string): Promise<Omit<ApiCredential, 'secretHash'>[]> {
+    return this.apiCredentialRepository.find({
+      where: { merchantId },
+      order: { createdAt: 'DESC' },
+      select: {
+        id: true,
+        merchantId: true,
+        publicKey: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  /**
+   * Revokes an API credential for a merchant.
+   */
+  async revokeCredential(
+    merchantId: string,
+    credentialId: string,
+  ): Promise<Omit<ApiCredential, 'secretHash'>> {
+    const credential = await this.apiCredentialRepository.findOne({
+      where: { id: credentialId, merchantId },
+    });
+
+    if (!credential) {
+      throw new NotFoundException(`API credential with ID ${credentialId} not found`);
+    }
+
+    credential.status = ApiCredentialStatus.REVOKED;
+    await this.apiCredentialRepository.save(credential);
+
+    const safeCredential = { ...credential };
+    delete (safeCredential as Partial<ApiCredential>).secretHash;
+    return safeCredential as Omit<ApiCredential, 'secretHash'>;
+  }
+
+  /**
    * Hashes a high-entropy secret using SHA-256.
    */
   private hashSecret(secret: string): string {

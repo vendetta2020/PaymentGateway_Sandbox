@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import * as http from 'http';
 import { AddressInfo } from 'net';
@@ -437,6 +438,218 @@ describe('WebhookModule (e2e)', () => {
       });
 
       expect(eventCount).toBe(1);
+    });
+
+    it('Concurrent webhook delivery retries should only dispatch ONE HTTP request', async () => {
+      const endpointUrl = `http://127.0.0.1:${receiverPort}/webhook`;
+      const configRes = await request(app.getHttpServer())
+        .post('/api/v1/webhook-configs')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({ endpointUrl });
+
+      const dummyPayment = await paymentRepo.save(
+        paymentRepo.create({
+          merchantId: merchantAId,
+          amount: 10000,
+          currency: 'IDR',
+          orderId: 'CONCUR-DELIVERY-TEST',
+          paymentMethod: 'QRIS' as any,
+          status: 'SUCCEEDED' as any,
+        }),
+      );
+
+      const event = await eventRepo.save(
+        eventRepo.create({
+          merchantId: merchantAId,
+          eventKey: 'CONCUR-DELIVERY-TEST-KEY',
+          eventType: WebhookEventType.PAYMENT_SUCCEEDED,
+          payload: { test: true },
+          paymentId: dummyPayment.id,
+        }),
+      );
+
+      const delivery = await deliveryRepo.save(
+        deliveryRepo.create({
+          webhookEvent: event,
+          webhookConfig: { id: configRes.body.data.id } as any,
+          status: WebhookDeliveryStatus.PENDING,
+          attemptCount: 0,
+        }),
+      );
+
+      receivedRequests = [];
+
+      const promises = Array.from({ length: 3 }).map(() =>
+        request(app.getHttpServer())
+          .post(`/api/v1/internal/webhook-deliveries/${delivery.id}/deliver`)
+          .set('Authorization', `Bearer ${secretA}`),
+      );
+
+      await Promise.all(promises);
+
+      expect(receivedRequests.length).toBe(1);
+
+      const updatedDelivery = await deliveryRepo.findOne({ where: { id: delivery.id } });
+      expect(updatedDelivery!.attemptCount).toBe(1);
+      expect(updatedDelivery!.status).toBe(WebhookDeliveryStatus.DELIVERED);
+    });
+  });
+
+  describe('Webhook SSRF Protection', () => {
+    it('Should block delivery to private IPs when ALLOW_DEV_LOCAL_WEBHOOKS is false', async () => {
+      const configService = app.get(ConfigService);
+      const originalGet = configService.get.bind(configService);
+      jest.spyOn(configService, 'get').mockImplementation((key) => {
+        if (key === 'ALLOW_DEV_LOCAL_WEBHOOKS') return false;
+        return originalGet(key);
+      });
+
+      const endpointUrl = `http://127.0.0.1:${receiverPort}/webhook`;
+      const configRes = await request(app.getHttpServer())
+        .post('/api/v1/webhook-configs')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({ endpointUrl });
+
+      const dummyPayment = await paymentRepo.save(
+        paymentRepo.create({
+          merchantId: merchantAId,
+          amount: 10000,
+          currency: 'IDR',
+          orderId: 'SSRF-TEST',
+          paymentMethod: 'QRIS' as any,
+          status: 'SUCCEEDED' as any,
+        }),
+      );
+
+      const event = await eventRepo.save(
+        eventRepo.create({
+          merchantId: merchantAId,
+          eventKey: 'SSRF-TEST-KEY',
+          eventType: WebhookEventType.PAYMENT_SUCCEEDED,
+          payload: { test: true },
+          paymentId: dummyPayment.id,
+        }),
+      );
+
+      const delivery = await deliveryRepo.save(
+        deliveryRepo.create({
+          webhookEvent: event,
+          webhookConfig: { id: configRes.body.data.id } as any,
+          status: WebhookDeliveryStatus.PENDING,
+          attemptCount: 0,
+        }),
+      );
+
+      receivedRequests = [];
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/internal/webhook-deliveries/${delivery.id}/deliver`)
+        .set('Authorization', `Bearer ${secretA}`)
+        .expect(201);
+
+      expect(response.body.data.status).toBe(WebhookDeliveryStatus.EXHAUSTED);
+      expect(response.body.data.lastError).toMatch(/SSRF Blocked/);
+      expect(receivedRequests.length).toBe(0);
+
+      jest.restoreAllMocks();
+    });
+  });
+
+  describe('Authenticated Webhook Deliveries Visibility & Retry', () => {
+    let merchantADeliveryId: string;
+
+    beforeAll(async () => {
+      const endpointUrl = `http://127.0.0.1:${receiverPort}/webhook`;
+      const configRes = await request(app.getHttpServer())
+        .post('/api/v1/webhook-configs')
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({ endpointUrl });
+
+      const dummyPayment = await paymentRepo.save(
+        paymentRepo.create({
+          merchantId: merchantAId,
+          amount: 500,
+          currency: 'IDR',
+          orderId: 'RETRY-TEST-ISOLATION',
+          paymentMethod: 'QRIS' as any,
+          status: 'SUCCEEDED' as any,
+        }),
+      );
+
+      const event = await eventRepo.save(
+        eventRepo.create({
+          merchantId: merchantAId,
+          eventKey: 'RETRY-TEST-ISOLATION-KEY',
+          eventType: WebhookEventType.PAYMENT_SUCCEEDED,
+          payload: { test: true },
+          paymentId: dummyPayment.id,
+        }),
+      );
+
+      const delivery = await deliveryRepo.save(
+        deliveryRepo.create({
+          webhookEvent: event,
+          webhookConfig: { id: configRes.body.data.id } as any,
+          status: WebhookDeliveryStatus.FAILED,
+          attemptCount: 1,
+        }),
+      );
+
+      merchantADeliveryId = delivery.id;
+    });
+
+    it('GET /api/v1/webhook-deliveries should return delivery history with events for Merchant A', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/webhook-deliveries')
+        .set('Authorization', `Bearer ${secretA}`)
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThanOrEqual(1);
+
+      // Find the specific delivery we created
+      const delivery = response.body.data.find((d: any) => d.id === merchantADeliveryId);
+      expect(delivery).toBeDefined();
+      expect(delivery.status).toBeDefined();
+      expect(delivery.attemptCount).toBeGreaterThanOrEqual(0);
+      expect(delivery.webhookEvent).toBeDefined();
+      expect(delivery.webhookEvent.merchantId).toBe(merchantAId);
+      expect(delivery.webhookEvent.eventType).toBeDefined();
+      expect(delivery.webhookEvent.payload).toBeDefined();
+      expect(delivery.webhookConfig).toBeDefined();
+      expect(delivery.webhookConfig.signingSecret).toBeUndefined();
+    });
+
+    it('GET /api/v1/webhook-deliveries should preserve merchant isolation (Merchant B sees 0 of A)', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/webhook-deliveries')
+        .set('Authorization', `Bearer ${secretB}`)
+        .expect(200);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.data).toHaveLength(0);
+    });
+
+    it('POST /api/v1/webhook-deliveries/:id/retry should retry delivery for authenticated merchant', async () => {
+      receiverStatusCode = 200;
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/webhook-deliveries/${merchantADeliveryId}/retry`)
+        .set('Authorization', `Bearer ${secretA}`)
+        .expect(201);
+
+      expect(response.body.status).toBe('success');
+      expect(response.body.data.id).toBe(merchantADeliveryId);
+      expect(response.body.data.status).toBe(WebhookDeliveryStatus.DELIVERED);
+      expect(response.body.data.lastHttpStatus).toBe(200);
+    });
+
+    it('POST /api/v1/webhook-deliveries/:id/retry should return 404 for Merchant B (isolation)', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/webhook-deliveries/${merchantADeliveryId}/retry`)
+        .set('Authorization', `Bearer ${secretB}`)
+        .expect(404);
     });
   });
 });

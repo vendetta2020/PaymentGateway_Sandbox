@@ -57,8 +57,10 @@ export interface SettlementPresentation {
   refundAmount: number;
   netAmount: number;
   currency: string;
+  settlementReference: string;
   periodStart: string;
   periodEnd: string;
+  settledAt?: string;
   createdAt: string;
 }
 
@@ -75,31 +77,89 @@ export type DiscrepancyType =
 
 export interface ReconciliationRunPresentation {
   id: string;
+  merchantId: string;
   status: ReconciliationStatus;
-  totalMatched: number;
-  totalDiscrepancies: number;
   periodStart: string;
   periodEnd: string;
+  totalInternalAmount: number;
+  totalProviderAmount: number;
+  matchedCount: number;
+  discrepancyCount: number;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ReconciliationResultPresentation {
+  id: string;
+  reconciliationRunId: string;
+  providerReference: string | null;
+  paymentId: string | null;
+  discrepancyType: DiscrepancyType;
+  internalAmount: number | null;
+  providerAmount: number | null;
+  internalCurrency: string | null;
+  providerCurrency: string | null;
+  internalStatus: string | null;
+  providerStatus: string | null;
+  details: string | null;
   createdAt: string;
 }
 
-export interface WebhookDeliveryPresentation {
+export type WebhookConfigStatus = 'ACTIVE' | 'DISABLED';
+
+export interface WebhookConfigPresentation {
   id: string;
   merchantId: string;
-  eventType: string;
-  status: 'SUCCESS' | 'FAILED';
-  attemptCount: number;
-  responseStatus: number | null;
-  deliveredAt: string | null;
+  endpointUrl: string;
+  status: WebhookConfigStatus;
+  signingSecret?: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export type WebhookDeliveryStatus =
+  | 'PENDING'
+  | 'DELIVERING'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'EXHAUSTED';
+
+export interface WebhookDeliveryPresentation {
+  id: string;
+  webhookEventId: string;
+  webhookConfigId: string;
+  status: WebhookDeliveryStatus;
+  attemptCount: number;
+  lastHttpStatus: number | null;
+  lastError: string | null;
+  deliveredAt: string | null;
+  nextAttemptAt: string | null;
+  lastAttemptAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  webhookEvent?: {
+    id: string;
+    merchantId: string;
+    paymentId: string;
+    eventType: string;
+    eventKey: string;
+    payload: Record<string, any>;
+    createdAt: string;
+  };
+  webhookConfig?: {
+    id: string;
+    merchantId: string;
+    endpointUrl: string;
+    status: WebhookConfigStatus;
+  };
 }
 
 export interface ApiCredentialPresentation {
   id: string;
-  name: string;
+  merchantId?: string;
   publicKey: string;
-  maskedSecretKey: string;
   status: 'ACTIVE' | 'REVOKED';
   createdAt: string;
-  lastUsedAt: string | null;
+  updatedAt: string;
 }
+

@@ -8,6 +8,7 @@ import { WebhookEventService } from './services/webhook-event.service';
 import { WebhookDeliveryService } from './services/webhook-delivery.service';
 import { WebhookConfigController } from './controllers/webhook-config.controller';
 import { InternalWebhookController } from './controllers/internal-webhook.controller';
+import { WebhookDeliveryController } from './controllers/webhook-delivery.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -15,7 +16,7 @@ import { AuthModule } from '../auth/auth.module';
     TypeOrmModule.forFeature([MerchantWebhookConfig, WebhookEvent, WebhookDelivery]),
     AuthModule,
   ],
-  controllers: [WebhookConfigController, InternalWebhookController],
+  controllers: [WebhookConfigController, InternalWebhookController, WebhookDeliveryController],
   providers: [WebhookConfigService, WebhookEventService, WebhookDeliveryService],
   exports: [WebhookConfigService, WebhookEventService, WebhookDeliveryService],
 })

@@ -188,28 +188,25 @@ describe('SettlementModule (e2e)', () => {
       expect(replayRes.body.data.id).toBe(stl.id);
       expect(replayRes.body.data.settlementReference).toBe(stl.settlementReference);
 
-      // 7. Transition status to PROCESSING, then to SETTLED
-      const trans1 = await request(app.getHttpServer())
-        .post(`/api/v1/settlements/${stl.id}/transition`)
-        .set('Authorization', `Bearer ${secretA}`)
-        .send({ status: SettlementStatus.PROCESSING })
-        .expect(201);
-      expect(trans1.body.data.status).toBe(SettlementStatus.PROCESSING);
-
-      const trans2 = await request(app.getHttpServer())
-        .post(`/api/v1/settlements/${stl.id}/transition`)
-        .set('Authorization', `Bearer ${secretA}`)
-        .send({ status: SettlementStatus.SETTLED })
-        .expect(201);
-      expect(trans2.body.data.status).toBe(SettlementStatus.SETTLED);
-      expect(trans2.body.data.settledAt).toBeDefined();
-
-      // 8. Verify immutability once SETTLED: attempts to mutate are rejected
+      // 7. Verify merchant CANNOT transition settlement (AUDIT-P16-001)
       await request(app.getHttpServer())
         .post(`/api/v1/settlements/${stl.id}/transition`)
         .set('Authorization', `Bearer ${secretA}`)
-        .send({ status: SettlementStatus.FAILED })
-        .expect(400);
+        .send({ status: SettlementStatus.PROCESSING })
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/settlements/${stl.id}/transition`)
+        .set('Authorization', `Bearer ${secretA}`)
+        .send({ status: SettlementStatus.SETTLED })
+        .expect(404);
+
+      // Verify it remains PENDING
+      const checkRes = await request(app.getHttpServer())
+        .get(`/api/v1/settlements/${stl.id}`)
+        .set('Authorization', `Bearer ${secretA}`)
+        .expect(200);
+      expect(checkRes.body.data.status).toBe(SettlementStatus.PENDING);
     });
 
     it('should enforce merchant isolation on settlements', async () => {

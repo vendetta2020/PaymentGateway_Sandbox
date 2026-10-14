@@ -52,7 +52,10 @@ ALLOW_DEV_LOCAL_WEBHOOKS=true
 ```bash
 docker compose up -d --build
 ```
-> Menjalankan PostgreSQL pada port `5432` dan backend NestJS pada port `3000`.
+> Menjalankan seluruh stack secara otomatis:
+> - **PostgreSQL**: port `5432`
+> - **Backend NestJS (API & Docs)**: port `3000`
+> - **Frontend Next.js (Dashboard)**: port `3001`
 
 **2. Opsi Manual / Bare-Metal:**
 

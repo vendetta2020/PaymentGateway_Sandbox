@@ -42,5 +42,25 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api/v1
+        NEXT_PUBLIC_ENVIRONMENT: TEST
+    container_name: web-payment-gateway
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      BACKEND_INTERNAL_URL: http://backend:3000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api/v1
+      NEXT_PUBLIC_ENVIRONMENT: TEST
+    ports:
+      - '3001:3000'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
   postgres_data:

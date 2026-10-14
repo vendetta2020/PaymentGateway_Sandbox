@@ -11,7 +11,7 @@ import { Logger } from '@nestjs/common';
 
 import { DataSource } from 'typeorm';
 
-describe('P17-003: Payment Lifecycle Events Transaction Commit Boundary', () => {
+describe('Payment Lifecycle Events Transaction Commit Boundary', () => {
   let paymentService: PaymentService;
   let idempotencyService: IdempotencyService;
   let metricsService: MetricsService;
@@ -95,7 +95,7 @@ describe('P17-003: Payment Lifecycle Events Transaction Commit Boundary', () => 
     jest.restoreAllMocks();
   });
 
-  it('1 & 8. payment.created after successful commit - successful transaction emits exactly one intended event', async () => {
+  it('should emit payment.created after successful commit - successful transaction emits exactly one intended event', async () => {
     await idempotencyService.executeIdempotent(
       'merch_123',
       'key_1',
@@ -127,7 +127,7 @@ describe('P17-003: Payment Lifecycle Events Transaction Commit Boundary', () => 
     expect(metricsService.increment).toHaveBeenCalledWith('paymentsCreated');
   });
 
-  it('4, 5 & 7. transaction rollback produces NO lifecycle creation event / DB failure before commit', async () => {
+  it('should not emit lifecycle event when transaction rollbacks or database fails before commit', async () => {
     mockQueryRunner.commitTransaction.mockRejectedValue(new Error('DB commit failure'));
 
     await expect(
@@ -161,7 +161,7 @@ describe('P17-003: Payment Lifecycle Events Transaction Commit Boundary', () => 
     expect(metricsService.increment).not.toHaveBeenCalled();
   });
 
-  it('2. payment.succeeded after successful commit', async () => {
+  it('should emit payment.succeeded only after successful transaction commit', async () => {
     await idempotencyService.executeIdempotent(
       'merch_123',
       'key_3',
@@ -186,7 +186,7 @@ describe('P17-003: Payment Lifecycle Events Transaction Commit Boundary', () => 
     expect(metricsService.increment).toHaveBeenCalledWith('paymentsSucceeded');
   });
 
-  it('9 & 10. idempotent replay does not incorrectly duplicate lifecycle events & concurrent processing does not produce false events', async () => {
+  it('should not duplicate lifecycle events on idempotent replay or concurrent processing', async () => {
     // Simulate finding an existing completed idempotency key
     // We can't access module here, but we can override mock on idempotencyService's repository since it's injected
     (idempotencyService as any).idempotencyKeyRepository.findOne.mockResolvedValueOnce({

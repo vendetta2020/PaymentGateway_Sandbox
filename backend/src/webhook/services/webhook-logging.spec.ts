@@ -9,7 +9,7 @@ import { WebhookDeliveryStatus } from '../enums/webhook-delivery-status.enum';
 import { WebhookConfigStatus } from '../enums/webhook-config-status.enum';
 import { Logger } from '@nestjs/common';
 
-describe('P17-004: Webhook Operational Events Before Persistence', () => {
+describe('Webhook Operational Events Persistence Order', () => {
   let service: WebhookDeliveryService;
   let deliveryRepo: any;
   let metricsService: MetricsService;
@@ -77,7 +77,7 @@ describe('P17-004: Webhook Operational Events Before Persistence', () => {
     jest.restoreAllMocks();
   });
 
-  it('1. Successful HTTP + successful DB save -> succeeded event', async () => {
+  it('should log succeeded event when HTTP call and DB save succeed', async () => {
     jest
       .spyOn(service as any, 'validateUrlSecurity')
       .mockResolvedValue({ isValid: true, pinnedIp: '1.2.3.4' });
@@ -92,7 +92,7 @@ describe('P17-004: Webhook Operational Events Before Persistence', () => {
     expect(metricsService.increment).toHaveBeenCalledWith('webhooksSucceeded');
   });
 
-  it('2. Successful HTTP + DB save failure -> NO succeeded event', async () => {
+  it('should not log succeeded event if DB save fails after successful HTTP dispatch', async () => {
     jest
       .spyOn(service as any, 'validateUrlSecurity')
       .mockResolvedValue({ isValid: true, pinnedIp: '1.2.3.4' });
@@ -109,7 +109,7 @@ describe('P17-004: Webhook Operational Events Before Persistence', () => {
     expect(metricsService.increment).not.toHaveBeenCalledWith('webhooksSucceeded');
   });
 
-  it('3. Exhausted delivery + successful DB save -> exhausted event', async () => {
+  it('should log exhausted event when delivery is terminal and DB save succeeds', async () => {
     jest
       .spyOn(service as any, 'validateUrlSecurity')
       .mockResolvedValue({ isValid: true, pinnedIp: '1.2.3.4' });
@@ -124,7 +124,7 @@ describe('P17-004: Webhook Operational Events Before Persistence', () => {
     expect(metricsService.increment).toHaveBeenCalledWith('webhooksFailed');
   });
 
-  it('4. Exhausted delivery + DB save failure -> NO exhausted event', async () => {
+  it('should not log exhausted event if DB save fails on terminal delivery', async () => {
     jest
       .spyOn(service as any, 'validateUrlSecurity')
       .mockResolvedValue({ isValid: true, pinnedIp: '1.2.3.4' });
@@ -139,7 +139,7 @@ describe('P17-004: Webhook Operational Events Before Persistence', () => {
     expect(metricsService.increment).not.toHaveBeenCalledWith('webhooksFailed');
   });
 
-  it('SSRF blocked + DB save failure -> NO exhausted event', async () => {
+  it('should not log exhausted event if SSRF block occurs but DB save fails', async () => {
     jest
       .spyOn(service as any, 'validateUrlSecurity')
       .mockResolvedValue({ isValid: false, reason: 'SSRF' });

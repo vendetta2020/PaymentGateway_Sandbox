@@ -91,7 +91,7 @@ describe('ReconciliationService', () => {
       ).rejects.toThrow('periodEnd must be strictly greater than periodStart');
     });
 
-    it('should reject periods longer than 31 days (AUDIT-P16-002)', async () => {
+    it('should reject periods longer than 31 days to prevent algorithmic denial of service', async () => {
       // Exactly 31 days should pass validation (but fail downstream if we don't mock, so we just mock the rest)
       runRepo.findOne.mockResolvedValue(null);
       runRepo.create.mockReturnValue({} as any);

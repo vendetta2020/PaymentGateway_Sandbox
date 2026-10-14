@@ -1,7 +1,7 @@
 # Modular Payment Gateway & Merchant Dashboard
 
 <p align="center">
-  <img src="design/stitch-v2.5/overview.png" width="650" alt="Payment Gateway Dashboard" />
+  <img src="docs/images/overview.png" width="650" alt="Payment Gateway Dashboard" />
 </p>
 
 Aplikasi web full-stack modular payment gateway dan merchant dashboard yang terinspirasi dari arsitektur platform pembayaran modern seperti Midtrans, Xendit, dan Stripe. Dilengkapi dengan state machine pembayaran, sistem rekonsiliasi & settlement, idempotency controls, webhook engine berorientasi keamanan (mitigasi SSRF & DNS Rebinding), serta audit logging berstandar enterprise.

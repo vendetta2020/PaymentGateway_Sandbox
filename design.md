@@ -1,8 +1,8 @@
-# Payment Gateway: Merchant Dashboard Design System (Stitch V2.5)
+# Payment Gateway: Merchant Dashboard Design System
 
-This document serves as the **authoritative visual source of truth** for the Payment Gateway frontend implementation. It translates the approved Stitch V2.5 visual references into a strict set of implementation rules.
+This document serves as the **design system specification** for the Payment Gateway frontend. It outlines the typography scales, color palettes, spacing tokens, and component behavior following a functional brutalist approach.
 
-> **CRITICAL INVARIANT**: This document describes *visual presentation* only. It does not dictate backend architecture, database schema, or financial calculation logic. The backend API remains the 100% authoritative source for all data, states, and financial amounts. Do not invent features or mock data not supported by the backend.
+> **Design Principle**: This document describes visual presentation and UI component guidelines. The backend API remains the authoritative source for all financial states, transaction amounts, and business logic.
 
 ---
 

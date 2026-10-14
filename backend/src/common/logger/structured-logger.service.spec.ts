@@ -101,9 +101,8 @@ describe('StructuredLoggerService', () => {
     });
   });
 
-  it('should reliably redact sensitive data regardless of common naming conventions (P17-001)', () => {
+  it('should reliably redact sensitive data regardless of casing and delimiters', () => {
     service.log({
-      // Confirmed bypasses
       card_number: '4111',
       'card-number': '4111',
       payment_card_number: '4111',

@@ -20,6 +20,8 @@ out/
 # IDE & Editors
 .idea/
 .vscode/
+.agent/
+.agents/
 *.swp
 *.swo
 *.sublime-workspace

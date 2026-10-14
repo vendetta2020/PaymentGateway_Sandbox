@@ -20,7 +20,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_ENVIRONMENT=TEST
 ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
 
-# Build Next.js application
+# Build Next.js standalone application
 RUN npm run build
 
 # Production runner stage
@@ -31,18 +31,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Install production dependencies only
-COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copy built artifacts from builder
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.mjs ./
-
-# Run as non-root user for security
 USER node
+
+# Copy standalone output and static assets
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

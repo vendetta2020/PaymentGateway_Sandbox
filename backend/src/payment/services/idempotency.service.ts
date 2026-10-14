@@ -101,6 +101,18 @@ export class IdempotencyService {
       // 7. Commit the transaction atomically
       await queryRunner.commitTransaction();
 
+      // 8. Execute any post-commit hooks
+      if (queryRunner.data && Array.isArray(queryRunner.data.afterCommitCallbacks)) {
+        for (const cb of queryRunner.data.afterCommitCallbacks) {
+          try {
+            cb();
+          } catch {
+            // "Logger failure cannot corrupt financial state."
+            // We intentionally swallow post-commit errors so the transaction remains successful
+          }
+        }
+      }
+
       return result;
     } catch (error) {
       try {

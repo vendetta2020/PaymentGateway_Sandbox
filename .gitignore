@@ -1,36 +1,54 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Build
+# Build & Compiled Output
 dist/
 build/
 .next/
 out/
 *.tsbuildinfo
+*.js.map
 
-# Environment
+# Environment files
 .env
 .env*.local
 !.env.example
 !.env.test
 
-# IDE
+# IDE & Editors
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-workspace
+*.sublime-project
 
-# OS
+# Operating System Files
 .DS_Store
 Thumbs.db
+Desktop.ini
+ehthumbs.db
 
-# Test
+# Test Coverage & Artifacts
 coverage/
+.nyc_output/
+*.lcov
+test_output*.txt
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Docker volumes (local)
+# Docker local volumes
 docker/postgres/data/
 docker/redis/data/
+postgres_data/
+
+# Temporary / Scratch scripts
+attack*.js
+attack*.ts

@@ -53,4 +53,18 @@ describe('HealthController', () => {
     expect(result.status).toBe('ok');
     expect(result.info?.database?.status).toBe('up');
   });
+
+  it('should return ok for live endpoint', () => {
+    const result = controller.live();
+    expect(result.status).toBe('ok');
+    expect(result.timestamp).toBeDefined();
+  });
+
+  it('should execute ready check with database ping', async () => {
+    const result = await controller.ready();
+
+    expect(healthCheckService.check).toHaveBeenCalledTimes(1); // since it's the second call in tests
+    expect(dbIndicator.pingCheck).toHaveBeenCalledWith('database');
+    expect(result.status).toBe('ok');
+  });
 });

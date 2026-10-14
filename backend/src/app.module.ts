@@ -10,6 +10,7 @@ import { WebhookModule } from './webhook/webhook.module';
 import { RefundModule } from './refund/refund.module';
 import { SettlementModule } from './settlement/settlement.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ReconciliationModule } from './reconciliation/reconciliation.module';
     }),
 
     // Infrastructure
+    CommonModule,
     DatabaseModule,
 
     // API modules

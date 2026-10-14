@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +10,7 @@ import * as crypto from 'crypto';
 import * as dns from 'dns/promises';
 import * as http from 'http';
 import * as https from 'https';
+import { MetricsService } from '../../common/metrics/metrics.service';
 
 export function computeWebhookSignature(
   secret: string,
@@ -59,6 +60,8 @@ export class WebhookDeliveryService {
     @InjectRepository(WebhookDelivery)
     private readonly deliveryRepository: Repository<WebhookDelivery>,
     private readonly configService: ConfigService,
+    @Optional()
+    private readonly metricsService?: MetricsService,
   ) {}
 
   private isPrivateOrLocalIp(ip: string): boolean {
@@ -256,6 +259,18 @@ export class WebhookDeliveryService {
 
       await queryRunner.manager.save(WebhookDelivery, delivery);
       await queryRunner.commitTransaction();
+
+      if (this.metricsService) {
+        this.metricsService.increment('webhooksStarted');
+      }
+
+      this.logger.log({
+        event: 'webhook.delivery.started',
+        webhookDeliveryId: delivery.id,
+        webhookEventId: webhookEvent.id,
+        merchantId: webhookEvent.merchantId,
+        attemptNumber,
+      });
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -270,7 +285,19 @@ export class WebhookDeliveryService {
     if (!ssrfCheck.isValid || !ssrfCheck.pinnedIp) {
       delivery.status = WebhookDeliveryStatus.EXHAUSTED;
       delivery.lastError = ssrfCheck.reason || 'SSRF blocked';
-      return this.deliveryRepository.save(delivery);
+
+      const saved = await this.deliveryRepository.save(delivery);
+
+      this.metricsService?.increment('webhooksFailed');
+      this.logger.error({
+        event: 'webhook.delivery.exhausted',
+        webhookDeliveryId: saved.id,
+        webhookEventId: webhookEvent.id,
+        merchantId: webhookEvent.merchantId,
+        error: saved.lastError,
+      });
+
+      return saved;
     }
 
     const rawPayload = JSON.stringify(webhookEvent.payload);
@@ -328,7 +355,39 @@ export class WebhookDeliveryService {
       this.handleRetryableFailure(delivery, delivery.attemptCount, errorMsg);
     }
 
-    return this.deliveryRepository.save(delivery);
+    const saved = await this.deliveryRepository.save(delivery);
+    const currentStatus = saved.status as WebhookDeliveryStatus;
+
+    if (currentStatus === WebhookDeliveryStatus.DELIVERED) {
+      this.metricsService?.increment('webhooksSucceeded');
+      this.logger.log({
+        event: 'webhook.delivery.succeeded',
+        webhookDeliveryId: saved.id,
+        webhookEventId: webhookEvent.id,
+        merchantId: webhookEvent.merchantId,
+      });
+    } else if (currentStatus === WebhookDeliveryStatus.EXHAUSTED) {
+      this.metricsService?.increment('webhooksFailed');
+      this.logger.error({
+        event: 'webhook.delivery.exhausted',
+        webhookDeliveryId: saved.id,
+        webhookEventId: webhookEvent.id,
+        merchantId: webhookEvent.merchantId,
+        error: saved.lastError,
+      });
+    } else if (currentStatus === WebhookDeliveryStatus.FAILED) {
+      this.metricsService?.increment('webhookRetries');
+      this.logger.warn({
+        event: 'webhook.delivery.retry_scheduled',
+        webhookDeliveryId: saved.id,
+        webhookEventId: webhookEvent.id,
+        merchantId: webhookEvent.merchantId,
+        error: saved.lastError,
+        nextAttemptAt: saved.nextAttemptAt,
+      });
+    }
+
+    return saved;
   }
 
   private handleRetryableFailure(

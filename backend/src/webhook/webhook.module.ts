@@ -10,10 +10,12 @@ import { WebhookConfigController } from './controllers/webhook-config.controller
 import { InternalWebhookController } from './controllers/internal-webhook.controller';
 import { WebhookDeliveryController } from './controllers/webhook-delivery.controller';
 import { AuthModule } from '../auth/auth.module';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([MerchantWebhookConfig, WebhookEvent, WebhookDelivery]),
+    CommonModule,
     AuthModule,
   ],
   controllers: [WebhookConfigController, InternalWebhookController, WebhookDeliveryController],

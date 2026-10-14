@@ -16,6 +16,7 @@ import { PaymentProvider } from '../providers/payment-provider.interface';
 import { WebhookEventService } from '../../webhook/services/webhook-event.service';
 import { WebhookDeliveryService } from '../../webhook/services/webhook-delivery.service';
 import { WebhookEventType } from '../../webhook/enums/webhook-event-type.enum';
+import { MetricsService } from '../../common/metrics/metrics.service';
 
 @Injectable()
 export class PaymentService {
@@ -30,7 +31,19 @@ export class PaymentService {
     private readonly webhookEventService?: WebhookEventService,
     @Optional()
     private readonly webhookDeliveryService?: WebhookDeliveryService,
+    @Optional()
+    private readonly metricsService?: MetricsService,
   ) {}
+
+  private executeAfterCommit(manager: EntityManager | undefined, callback: () => void) {
+    if (manager?.queryRunner) {
+      const qrData = manager.queryRunner.data;
+      qrData.afterCommitCallbacks = qrData.afterCommitCallbacks || [];
+      qrData.afterCommitCallbacks.push(callback);
+    } else {
+      callback();
+    }
+  }
 
   async createPayment(
     merchantId: string,
@@ -59,6 +72,19 @@ export class PaymentService {
 
     try {
       const saved = await repo.save(payment);
+
+      this.executeAfterCommit(manager, () => {
+        this.logger.log({
+          event: 'payment.created',
+          paymentId: saved.id,
+          merchantId: saved.merchantId,
+          orderId: saved.orderId,
+        });
+
+        if (this.metricsService) {
+          this.metricsService.increment('paymentsCreated');
+        }
+      });
 
       if (this.webhookEventService) {
         const deliveryIds = await this.webhookEventService.recordPaymentEvent(
@@ -150,6 +176,14 @@ export class PaymentService {
       throw new BadRequestException(`Cannot process payment in status ${payment.status}`);
     }
 
+    this.executeAfterCommit(manager, () => {
+      this.logger.log({
+        event: 'payment.processing',
+        paymentId,
+        merchantId,
+      });
+    });
+
     // Step 2: Call the provider. Only one concurrent request can reach here
     // for any given payment because of the atomic claim above.
     try {
@@ -169,6 +203,24 @@ export class PaymentService {
       );
 
       const updatedPayment = await this.getPayment(merchantId, paymentId, manager);
+
+      this.executeAfterCommit(manager, () => {
+        this.logger.log({
+          event: newStatus === PaymentStatus.SUCCEEDED ? 'payment.succeeded' : 'payment.failed',
+          paymentId: updatedPayment.id,
+          merchantId: updatedPayment.merchantId,
+          providerReference: updatedPayment.providerReference,
+          status: newStatus,
+        });
+
+        if (this.metricsService) {
+          if (newStatus === PaymentStatus.SUCCEEDED) {
+            this.metricsService.increment('paymentsSucceeded');
+          } else if (newStatus === PaymentStatus.FAILED) {
+            this.metricsService.increment('paymentsFailed');
+          }
+        }
+      });
 
       if (this.webhookEventService) {
         const eventType =
@@ -221,6 +273,23 @@ export class PaymentService {
     }
 
     const updatedPayment = await this.getPayment(merchantId, paymentId, manager);
+
+    this.executeAfterCommit(manager, () => {
+      this.logger.log({
+        event: `payment.${newStatus.toLowerCase()}`,
+        paymentId: updatedPayment.id,
+        merchantId: updatedPayment.merchantId,
+        status: newStatus,
+      });
+
+      if (this.metricsService) {
+        if (newStatus === PaymentStatus.SUCCEEDED) {
+          this.metricsService.increment('paymentsSucceeded');
+        } else if (newStatus === PaymentStatus.FAILED) {
+          this.metricsService.increment('paymentsFailed');
+        }
+      }
+    });
 
     if (this.webhookEventService) {
       let eventType: WebhookEventType | null = null;

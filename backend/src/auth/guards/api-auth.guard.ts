@@ -2,6 +2,7 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { Request } from 'express';
 import { ApiCredentialService } from '../services/api-credential.service';
 import { MerchantStatus } from '../../merchant/enums/merchant-status.enum';
+import { loggerContext } from '../../common/logger/logger.context';
 
 @Injectable()
 export class ApiAuthGuard implements CanActivate {
@@ -46,6 +47,11 @@ export class ApiAuthGuard implements CanActivate {
       merchantId: credential.merchantId,
       credentialId: credential.id,
     };
+
+    const ctx = loggerContext.getStore();
+    if (ctx) {
+      ctx.merchantId = credential.merchantId;
+    }
 
     return true;
   }

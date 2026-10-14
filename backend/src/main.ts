@@ -1,15 +1,19 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { StructuredLoggerService } from './common/logger/structured-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const customLogger = app.get(StructuredLoggerService);
+  app.useLogger(customLogger);
+
   const configService = app.get(ConfigService);
-  const logger = new Logger('Bootstrap');
+  const logger = customLogger;
 
   // Security headers
   app.use(helmet());
@@ -24,7 +28,7 @@ async function bootstrap() {
 
   // API versioning via global prefix (excluding health check)
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health'],
+    exclude: ['health', 'health/live', 'health/ready'],
   });
 
   // Request validation — whitelist strips unknown properties,

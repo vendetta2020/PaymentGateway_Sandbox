@@ -57,10 +57,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else {
       // Non-HTTP exceptions — log the full error but don't expose internals
-      this.logger.error(
-        'Unhandled exception',
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      this.logger.error({
+        event: 'http.request.error',
+        errorCode: 'INTERNAL_ERROR',
+        error: exception instanceof Error ? exception.message : String(exception),
+        stack: exception instanceof Error ? exception.stack : undefined,
+      });
+    }
+
+    if (exception instanceof HttpException) {
+      this.logger.warn({
+        event: 'http.request.error',
+        errorCode: 'CLIENT_ERROR',
+        status,
+        message,
+      });
     }
 
     response.status(status).json({
@@ -70,6 +81,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ...(details !== undefined ? { details } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId: (request as any).id, // Include requestId in response body for correlation
     });
   }
 }

@@ -8,11 +8,17 @@ export class HealthController {
     private readonly db: TypeOrmHealthIndicator,
   ) {}
 
-  /**
-   * GET /health
-   *
-   * Returns API health status and verifies PostgreSQL database connectivity.
-   */
+  @Get('live')
+  live() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  @Get('ready')
+  @HealthCheck()
+  ready() {
+    return this.health.check([() => this.db.pingCheck('database')]);
+  }
+
   @Get()
   @HealthCheck()
   check() {

@@ -9,9 +9,15 @@ import { InternalPaymentController } from './controllers/internal-payment.contro
 import { SimulatedPaymentProvider } from './providers/simulated-payment.provider';
 import { AuthModule } from '../auth/auth.module';
 import { WebhookModule } from '../webhook/webhook.module';
+import { CommonModule } from '../common/common.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment, IdempotencyKey]), AuthModule, WebhookModule],
+  imports: [
+    TypeOrmModule.forFeature([Payment, IdempotencyKey]),
+    AuthModule,
+    WebhookModule,
+    CommonModule,
+  ],
   controllers: [PaymentController, InternalPaymentController],
   providers: [
     PaymentService,

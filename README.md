@@ -54,7 +54,7 @@ docker compose up -d --build
 ```
 > Menjalankan seluruh stack secara otomatis:
 > - **PostgreSQL**: port `5432`
-> - **Backend NestJS (API & Docs)**: port `3000`
+> - **Backend NestJS (API & Docs)**: port `3005`
 > - **Frontend Next.js (Dashboard)**: port `3001`
 
 **2. Opsi Manual / Bare-Metal:**
@@ -76,8 +76,8 @@ npm run dev -- -p 3001
 
 Akses aplikasi di:
 - **Merchant Dashboard (Frontend):** `http://localhost:3001`
-- **REST API & Swagger Docs (Backend):** `http://localhost:3000/docs`
-- **Health Check Endpoint:** `http://localhost:3000/health`
+- **REST API & Swagger Docs (Backend):** `http://localhost:3005/docs`
+- **Health Check Endpoint:** `http://localhost:3005/health`
 
 ---
 

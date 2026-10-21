@@ -36,7 +36,7 @@ services:
       ALLOW_DEV_WEBHOOK_DELIVERY: 'true'
       ALLOW_DEV_LOCAL_WEBHOOKS: 'true'
     ports:
-      - '3000:3000'
+      - '3005:3000'
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,14 +47,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api/v1
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:3005/api/v1
         NEXT_PUBLIC_ENVIRONMENT: TEST
     container_name: web-payment-gateway
     environment:
       NODE_ENV: production
       PORT: 3000
       BACKEND_INTERNAL_URL: http://backend:3000
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api/v1
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3005/api/v1
       NEXT_PUBLIC_ENVIRONMENT: TEST
     ports:
       - '3001:3000'

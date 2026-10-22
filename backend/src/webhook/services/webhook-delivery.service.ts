@@ -114,7 +114,7 @@ export class WebhookDeliveryService {
       const isCloudMetadata =
         hostname === '169.254.169.254' ||
         hostname === 'metadata.google.internal' ||
-        hostname.endsWith('.internal');
+        (hostname.endsWith('.internal') && (!allowLocal || hostname !== 'host.docker.internal'));
 
       if (isCloudMetadata) {
         return { isValid: false, reason: 'SSRF Blocked: Cloud metadata access prohibited.' };

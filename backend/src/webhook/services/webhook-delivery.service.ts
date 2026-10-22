@@ -234,7 +234,8 @@ export class WebhookDeliveryService {
 
       if (
         delivery.status !== WebhookDeliveryStatus.PENDING &&
-        delivery.status !== WebhookDeliveryStatus.FAILED
+        delivery.status !== WebhookDeliveryStatus.FAILED &&
+        delivery.status !== WebhookDeliveryStatus.EXHAUSTED
       ) {
         await queryRunner.rollbackTransaction();
         return delivery;

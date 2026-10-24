@@ -19,8 +19,19 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS configuration for frontend merchant dashboard
+  const frontendUrl = configService.get<string>('FRONTEND_URL');
+  const allowedOrigins: (string | RegExp)[] = [
+    'http://localhost:3001',
+    'http://localhost:3000',
+    'http://localhost:3005',
+    /\.vercel\.app$/,
+  ];
+  if (frontendUrl) {
+    allowedOrigins.push(frontendUrl);
+  }
+
   app.enableCors({
-    origin: ['http://localhost:3001', 'http://localhost:3000', 'http://localhost:3005'],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
